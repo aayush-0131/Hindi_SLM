@@ -1,0 +1,5 @@
+{
+  "passed": false,
+  "reason": "No steps past step 20 were logged (0 step lines seen). The shakedown did not get far enough to measure steady-state throughput.",
+  "base_train_exit_code": 1
+}

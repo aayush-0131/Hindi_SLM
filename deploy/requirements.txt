@@ -1,0 +1,10 @@
+datasets
+huggingface_hub
+transformers
+accelerate
+pyarrow
+pandas
+tqdm
+datasketch
+torch
+lighteval
