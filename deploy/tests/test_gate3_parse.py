@@ -75,9 +75,20 @@ def test_pass_discards_warmup():
     assert r["steps_discarded_as_warmup"] == 2, r
     assert abs(r["measured_mfu_pct"] - (38.42 + 39.18 + 38.85) / 3) < 0.01, r
     assert r["passed"] is True, r
-    assert r["fits_28h_budget"] is True, r
+    import training.config as C
+    # Derived from config, and from TOTAL_STEP_EQUIVALENTS rather than
+    # TOTAL_STEPS -- two decay branches are paid for in wall-clock but counted
+    # once in a single trajectory. This assertion used to read `is True`, which
+    # was only correct while TOTAL_STEPS was the stale 28,000 (Bug 14).
+    expected_fits = (r["mean_sec_per_step"] * C.TOTAL_STEP_EQUIVALENTS
+                     <= C.SPEC_GPU_HOUR_CEILING * 3600)
+    assert r["fits_gpu_hour_ceiling"] is expected_fits, (
+        r, C.TOTAL_STEP_EQUIVALENTS)
+    assert r["gpu_hour_ceiling"] == C.SPEC_GPU_HOUR_CEILING
     print(f"  warmup discard:       OK (MFU {r['measured_mfu_pct']}%, "
-          f"{r['projected_total_hours']}h projected)")
+          f"{r['projected_total_hours']}h projected over "
+          f"{C.TOTAL_STEP_EQUIVALENTS:,} step-equivalents, "
+          f"fits={r['fits_gpu_hour_ceiling']})")
 
 
 def test_requirement_1_4_recompute():
@@ -86,8 +97,14 @@ def test_requirement_1_4_recompute():
     rec = r["requirement_1_4_recompute"]
     assert rec["realized_params"] == 419_954_688
     assert rec["delta_pct"] == 5.0, rec          # +5% over the spec's 400M
-    assert rec["D_tokens_at_current_step_budget"] == 28_000 * 524_288
-    assert abs(rec["C_6ND"] - 6 * 419_954_688 * 28_000 * 524_288) < 1e6
+    # Sourced from config rather than the literal 28,000 this used to assert.
+    # TOTAL_STEPS was corrected 28,000 -> 30,500 (the live run's value) and
+    # this test was the thing that caught the mismatch.
+    import training.config as C
+    expected_d = C.TOTAL_STEPS * C.TOTAL_BATCH_TOKENS
+    assert rec["D_tokens_at_current_step_budget"] == expected_d, (
+        rec["D_tokens_at_current_step_budget"], expected_d)
+    assert abs(rec["C_6ND"] - 6 * 419_954_688 * expected_d) < 1e6
     assert 30 < rec["tokens_per_param"] < 40, rec
     print(f"  Req 1.4 recompute:    OK (N={rec['realized_params']:,}, "
           f"C={rec['C_6ND']:.2e}, {rec['tokens_per_param']} tok/param)")
@@ -120,7 +137,7 @@ def test_red_flag_on_slow_steps():
     steps, params, flops, peak = parse(slow)
     r = g.evaluate(steps, params, flops, peak)
     assert "red_flag" in r, r
-    assert r["fits_28h_budget"] is False, r
+    assert r["fits_gpu_hour_ceiling"] is False, r
     print(f"  red flag on slow step: OK ({r['projected_total_hours']}h projected)")
 
 

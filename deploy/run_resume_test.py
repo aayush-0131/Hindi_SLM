@@ -47,7 +47,11 @@ LOSS_SPIKE_TOLERANCE = 0.15
 
 
 def run(nanochat_dir, extra_args, label):
-    cmd = [sys.executable, "-m", "scripts.base_train"] + extra_args
+    # -u is load-bearing: base_train's stdout is a PIPE here, so Python
+    # block-buffers it. If the child dies without flushing (a C-level abort,
+    # os._exit, or a CUDA abort), the buffered tail -- including the
+    # traceback -- is lost, and the failure looks like "exited 1, no output".
+    cmd = [sys.executable, "-u", "-m", "scripts.base_train"] + extra_args
     print(f"\n{'=' * 72}\n{label}\n{'=' * 72}\n+ {' '.join(cmd)}\n", flush=True)
     proc = subprocess.Popen(cmd, cwd=nanochat_dir, stdout=subprocess.PIPE,
                             stderr=subprocess.STDOUT, text=True, bufsize=1,
@@ -99,9 +103,36 @@ def check_artifacts(base_dir, step):
             "meta_files": meta}
 
 
+def _find_nanochat(explicit=None):
+    """Locate the nanochat repo without assuming the caller's cwd.
+
+    The default used to be the bare relative path "../nanochat", which is only
+    correct when invoked from inside deploy/. Run one directory up -- the
+    natural place, since that is where hindi_env.sh lives -- and it resolved to
+    a sibling of workspaces/ and failed with "nanochat dir not found".
+    Checked in order: explicit flag, $NANOCHAT_DIR, the parent of this file's
+    directory, then $TEAM.
+    """
+    import os
+    candidates = []
+    if explicit:
+        candidates.append(explicit)
+    if os.environ.get("NANOCHAT_DIR"):
+        candidates.append(os.environ["NANOCHAT_DIR"])
+    here = os.path.dirname(os.path.abspath(__file__))
+    candidates.append(os.path.join(os.path.dirname(here), "nanochat"))
+    if os.environ.get("TEAM"):
+        candidates.append(os.path.join(os.environ["TEAM"], "nanochat"))
+    candidates.append("../nanochat")
+    for c in candidates:
+        if c and os.path.isdir(os.path.join(c, "nanochat")):
+            return os.path.abspath(c)
+    return None
+
+
 def main():
     ap = argparse.ArgumentParser(description="Requirement 7.7 resume smoke test")
-    ap.add_argument("--nanochat-dir", default="../nanochat")
+    ap.add_argument("--nanochat-dir", default=None)
     ap.add_argument("--save-at", type=int, default=20,
                     help="checkpoint interval; the test resumes from this step")
     ap.add_argument("--total-steps", type=int, default=40,
@@ -117,6 +148,13 @@ def main():
         return 1
 
     result = {"save_at": args.save_at, "total_steps": args.total_steps}
+
+    args.nanochat_dir = _find_nanochat(args.nanochat_dir)
+    if not args.nanochat_dir:
+        print("RESUME TEST FAILED: could not locate the nanochat repo. Pass "
+              "--nanochat-dir explicitly.", file=sys.stderr)
+        return 1
+    print(f"nanochat repo: {args.nanochat_dir}")
 
     rc1, steps1 = run(args.nanochat_dir,
                       phase_args(args.total_steps, args.save_at),

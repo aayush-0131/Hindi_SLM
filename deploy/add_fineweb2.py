@@ -63,7 +63,7 @@ DEFAULT_MIN_CHARS = 200
 
 def stream_and_write(out_dir, max_docs, shard_size, min_language_score,
                      max_cluster_size, min_chars, progress_every,
-                     start_shard_idx):
+                     start_shard_idx, shard_prefix="fw2", skip_docs=0):
     from datasets import load_dataset
 
     os.makedirs(out_dir, exist_ok=True)
@@ -80,13 +80,25 @@ def stream_and_write(out_dir, max_docs, shard_size, min_language_score,
         nonlocal buf, shard_idx
         if not buf:
             return
-        path = os.path.join(out_dir, f"fw2_{shard_idx:05d}.parquet")
+        path = os.path.join(out_dir, f"{shard_prefix}_{shard_idx:05d}.parquet")
         pq.write_table(pa.Table.from_pylist(buf, schema=FINAL_SCHEMA), path)
         shard_idx += 1
         buf = []
 
     for row in ds:
         scanned += 1
+        # SKIP the prefix of the stream that a previous run already consumed.
+        # `load_dataset(streaming=True)` iterates shards in a fixed order, so
+        # the first N documents are reproducible -- which is what makes this a
+        # valid way to reach FRESH documents. Without it, a second run re-adds
+        # the same documents the corpus already contains: Round 1 consumed
+        # 5,937,266 rows, so a fresh run from 0 would duplicate ~5.9M docs and
+        # add far fewer new unique tokens than the --max-docs figure suggests.
+        if scanned <= skip_docs:
+            if progress_every and scanned % (progress_every * 5) == 0:
+                print(f"[fineweb2] skipping {scanned:,}/{skip_docs:,} "
+                      f"already-consumed rows", flush=True)
+            continue
         text = row.get("text") or ""
 
         if len(text) < min_chars:
@@ -114,21 +126,27 @@ def stream_and_write(out_dir, max_docs, shard_size, min_language_score,
             break
         if scanned % progress_every == 0:
             rate = scanned / max(time.time() - t0, 1e-9)
+            considered = max(scanned - skip_docs, 1)
             print(f"[fineweb2] scanned {scanned:,} kept {kept:,} "
-                  f"({100 * kept / scanned:.1f}%) | rejected: lang={rej_lang:,} "
+                  f"({100 * kept / considered:.1f}%) | rejected: lang={rej_lang:,} "
                   f"dupe={rej_dupe:,} short={rej_short:,} | {rate:,.0f} rows/s",
                   flush=True)
 
     flush()
     dt = time.time() - t0
     print(f"\n[fineweb2] DONE in {dt / 60:.1f} min")
-    print(f"  scanned:  {scanned:,}")
-    print(f"  kept:     {kept:,} ({100 * kept / max(scanned, 1):.1f}%)")
+    print(f"  scanned:  {scanned:,}" +
+          (f" ({skip_docs:,} skipped as already-consumed)" if skip_docs else ""))
+    # Keep rate over rows CONSIDERED, not total scanned -- otherwise a large
+    # --skip-docs makes the rate unreadable against Round 1's 84.2% baseline.
+    considered = max(scanned - skip_docs, 1)
+    print(f"  kept:     {kept:,} ({100 * kept / considered:.1f}% of "
+          f"{considered:,} considered)")
     print(f"  rejected: language_score<{min_language_score}: {rej_lang:,} | "
           f"cluster_size>{max_cluster_size}: {rej_dupe:,} | "
           f"<{min_chars} chars: {rej_short:,}")
-    print(f"  shards:   fw2_{start_shard_idx:05d}..fw2_{shard_idx - 1:05d} "
-          f"in {out_dir}")
+    print(f"  shards:   {shard_prefix}_{start_shard_idx:05d}.."
+          f"{shard_prefix}_{shard_idx - 1:05d} in {out_dir}")
     return kept, shard_idx
 
 
@@ -148,20 +166,74 @@ def main():
                     default=DEFAULT_MAX_CLUSTER_SIZE)
     ap.add_argument("--min-chars", type=int, default=DEFAULT_MIN_CHARS)
     ap.add_argument("--progress-every", type=int, default=100_000)
+    ap.add_argument("--allow-no-skip", action="store_true",
+                    help="permit appending with --skip-docs 0, accepting "
+                         "duplicate documents")
+    ap.add_argument("--skip-docs", type=int, default=0,
+                    help="skip this many rows of the stream before keeping "
+                         "anything. REQUIRED when appending to a corpus an "
+                         "earlier run already fed: the stream order is fixed, "
+                         "so starting from 0 re-adds documents you already "
+                         "have. Round 1 consumed 5,937,266 rows -> use 6000000.")
     ap.add_argument("--start-shard-idx", type=int, default=0,
-                    help="first shard number; raise it if fw2_* shards already "
-                         "exist in --out-dir and you are adding more")
+                    help="first shard number; raise it if shards with this "
+                         "prefix already exist in --out-dir and you are "
+                         "adding more")
+    ap.add_argument("--shard-prefix", default="fw2",
+                    help="filename prefix for written shards (default: fw2). "
+                         "Must sort BEFORE the val shard -- see the reminder "
+                         "printed after a successful run.")
     args = ap.parse_args()
 
-    existing = [f for f in os.listdir(args.out_dir)
-                if f.startswith("fw2_") and f.endswith(".parquet")] \
-        if os.path.isdir(args.out_dir) else []
+    listing = os.listdir(args.out_dir) if os.path.isdir(args.out_dir) else []
+    # Overwrite guard: only shards sharing THIS prefix can actually be
+    # clobbered, since the filename is prefix + index.
+    existing = [f for f in listing
+                if f.startswith(f"{args.shard_prefix}_")
+                and f.endswith(".parquet")]
     if existing and args.start_shard_idx == 0:
-        print(f"REFUSING TO RUN: {len(existing)} fw2_*.parquet shards already "
-              f"exist in {args.out_dir} and --start-shard-idx is 0, which would "
-              f"overwrite them. Pass --start-shard-idx {len(existing)} to append, "
-              f"or delete them first.", file=sys.stderr)
+        print(f"REFUSING TO RUN: {len(existing)} "
+              f"{args.shard_prefix}_*.parquet shards already exist in "
+              f"{args.out_dir} and --start-shard-idx is 0, which would "
+              f"overwrite them. Pass --start-shard-idx {len(existing)} to "
+              f"append, or delete them first.", file=sys.stderr)
         return 1
+
+    # Ordering guard, separate from the overwrite guard above. nanochat streams
+    # shards in SORTED filename order, so appending a block of shards under one
+    # prefix puts every new document in one contiguous run of the stream --
+    # which is precisely the source-ordering problem that cost Round 1 a +42%
+    # train-loss spike once per epoch (ROUND2_HANDOFF.md sec 9.1). Adding data
+    # is therefore only half the job; the corpus has to be re-interleaved
+    # afterwards. Warn loudly here rather than let that be discovered from a
+    # loss curve 5 hours into a GPU window.
+    other_shards = [f for f in listing
+                    if f.endswith(".parquet")
+                    and not f.startswith(f"{args.shard_prefix}_")]
+    val_shards = sorted(f for f in listing if f.startswith("zz_"))
+    if val_shards:
+        # A new shard sorting at/after the val shard would silently BECOME the
+        # validation set. Refuse rather than warn: this one is unrecoverable.
+        sample_name = f"{args.shard_prefix}_{args.start_shard_idx:05d}.parquet"
+        if sample_name >= val_shards[0]:
+            print(f"REFUSING TO RUN: shards named {sample_name!r} sort at or "
+                  f"after the validation shard {val_shards[0]!r}. nanochat "
+                  f"takes the LAST sorted shard as its val split, so these "
+                  f"would silently replace the validation set. Choose a "
+                  f"--shard-prefix that sorts earlier.", file=sys.stderr)
+            return 1
+
+    if existing and args.skip_docs == 0:
+        print(f"REFUSING TO RUN: {len(existing)} shard(s) with prefix "
+              f"{args.shard_prefix!r} already exist, but --skip-docs is 0. "
+              f"FineWeb-2 streams in a FIXED order, so this would re-add the "
+              f"same documents those shards already contain -- inflating the "
+              f"corpus with duplicates while appearing to grow it. Round 1 "
+              f"consumed 5,937,266 rows; pass --skip-docs 6000000 (or 0 "
+              f"explicitly via --allow-no-skip if you really want overlap).",
+              file=sys.stderr)
+        if not args.allow_no_skip:
+            return 1
 
     print(f"Streaming FineWeb-2 hin_Deva (train) -> {args.out_dir}")
     print(f"  target: {args.max_docs:,} kept docs "
@@ -172,8 +244,18 @@ def main():
     stream_and_write(
         args.out_dir, args.max_docs, args.shard_size, args.min_language_score,
         args.max_cluster_size, args.min_chars, args.progress_every,
-        args.start_shard_idx,
+        args.start_shard_idx, args.shard_prefix, args.skip_docs,
     )
+
+    if other_shards:
+        print(f"\n{'=' * 68}\nNEXT STEP REQUIRED -- the corpus is now "
+              f"source-ordered again\n{'=' * 68}")
+        print(f"{len(other_shards)} shard(s) under other prefixes were already "
+              f"in {args.out_dir}, so the\nshards just written form one "
+              f"contiguous block in nanochat's sorted\nstream. That is the "
+              f"Round 1 ordering problem (+42% train-loss spike\nonce per "
+              f"epoch). Re-interleave before training:\n")
+        print(f"    python3 run_interleave.py --corpus-dir {args.out_dir}\n")
     return 0
 
 

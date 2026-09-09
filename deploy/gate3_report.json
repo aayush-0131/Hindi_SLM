@@ -1,5 +1,33 @@
 {
-  "passed": false,
-  "reason": "No steps past step 20 were logged (0 step lines seen). The shakedown did not get far enough to measure steady-state throughput.",
-  "base_train_exit_code": 1
+  "passed": true,
+  "measured_mfu_pct": 51.14,
+  "threshold_pct": 35.0,
+  "mean_sec_per_step": 3.319,
+  "sec_per_step_budget": 4.0,
+  "steps_measured": 39,
+  "steps_discarded_as_warmup": 21,
+  "gpu_peak_flops": 989000000000000.0,
+  "flops_per_token": 3199221000.0,
+  "param_counts": {
+    "wte": 37748736,
+    "value_embeds": 452984832,
+    "lm_head": 37748736,
+    "transformer_matrices": 382208544,
+    "scalars": 74,
+    "total": 910690922
+  },
+  "projected_stable_hours": 24.89,
+  "projected_total_hours": 33.19,
+  "gpu_hour_ceiling": 40.0,
+  "fits_gpu_hour_ceiling": true,
+  "requirement_1_4_recompute": {
+    "spec_param_target": 400000000,
+    "realized_params": 910690922,
+    "delta_pct": 127.7,
+    "D_tokens_at_current_step_budget": 16515072000,
+    "C_6ND": 90240756879458304000,
+    "tokens_per_param": 18.1,
+    "note": "The spec's recomputed target was C~=3.53e19 at N=400M. If C_6ND exceeds that materially, the honest options are to cut TOTAL_STEPS or to accept a higher realized compute -- but the binding constraint is GPU-hours (projected_total_hours), not C, so prefer the wall-clock number for scheduling."
+  },
+  "base_train_exit_code": 0
 }

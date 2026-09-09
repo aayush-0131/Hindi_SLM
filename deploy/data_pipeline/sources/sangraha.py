@@ -10,7 +10,8 @@ Run it first. If it raises, update EXPECTED_TYPE_VALUES and the mapping in
 """
 
 from datasets import load_dataset
-from data_pipeline.sources.common import normalize_records, write_corpus_docs
+from data_pipeline.sources.common import (append_corpus_docs,
+                                          normalize_records, write_corpus_docs)
 
 # Best-guess literal values -- CONFIRM via inspect_sangraha_types() before trusting this.
 EXPECTED_TYPE_VALUES = {"web", "pdf", "speech"}
@@ -67,7 +68,8 @@ def _iter_verified(type_value, max_docs=None, max_scan=None, progress_every=20_0
             break
 
 
-def acquire_all_verified(out_dirs, max_docs=None, max_scan=None, progress_every=20_000):
+def acquire_all_verified(out_dirs, max_docs=None, max_scan=None,
+                         progress_every=20_000, flush_every=None):
     """
     Single pass over verified/hin, bucketing rows into web/pdf/speech
     simultaneously -- replaces calling the per-type acquire functions
@@ -95,16 +97,49 @@ def acquire_all_verified(out_dirs, max_docs=None, max_scan=None, progress_every=
     counts = {t: 0 for t in types}
     done = {t: (max_docs[t] == 0) for t in types}
 
+    # Incremental mode. Without it this function holds every document in RAM
+    # and writes only at the end, so a long scan is all-or-nothing -- a 5-hour
+    # Sangraha scan that dies at hour 5 loses everything. RAM is not the issue
+    # (the box has 2.2 TB); durability is. With flush_every set, each type's
+    # buffer is written to durable parquet as it fills, under a run-unique
+    # prefix that also keeps it from colliding with an earlier acquisition in
+    # the same directory.
+    import uuid as _uuid
+    run_tag = _uuid.uuid4().hex[:8]
+    part_idx = {t: 0 for t in types}
+    flushed = {t: 0 for t in types}
+
+    def _flush_incremental(t, final=False):
+        if not buffers[t]:
+            return
+        records = normalize_records(iter(buffers[t]),
+                                    source=f"sangraha_verified_{t}")
+        n = append_corpus_docs(records, out_dirs[t], f"inc-{run_tag}-{t}",
+                               start_idx=part_idx[t])
+        part_idx[t] += 1
+        flushed[t] += n
+        buffers[t] = []
+        print(f"[sangraha:verified] flushed {n:,} {t} docs "
+              f"({flushed[t]:,} durable so far){' [final]' if final else ''}",
+              flush=True)
+
     ds = load_dataset("ai4bharat/sangraha", data_dir="verified/hin", split="train", streaming=True)
     scanned = 0
     for row in ds:
         scanned += 1
         t = row["type"]
         if t in types and not done.get(t, True):
-            buffers[t].append({"doc_id": f"sangraha-verified-{t}-{counts[t]}", "text": row["text"]})
+            # doc_id carries run_tag in incremental mode: counts[t] restarts at
+            # 0 every run, so a plain index would collide with an earlier
+            # acquisition already in the same directory and corrupt provenance.
+            doc_id = (f"sangraha-verified-{t}-{run_tag}-{counts[t]}"
+                      if flush_every else f"sangraha-verified-{t}-{counts[t]}")
+            buffers[t].append({"doc_id": doc_id, "text": row["text"]})
             counts[t] += 1
             if max_docs[t] is not None and counts[t] >= max_docs[t]:
                 done[t] = True
+            if flush_every and len(buffers[t]) >= flush_every:
+                _flush_incremental(t)
         if scanned % progress_every == 0:
             print(f"[sangraha:verified] scanned {scanned} rows, found so far: "
                   f"web={counts['web']} pdf={counts['pdf']} speech={counts['speech']}...")
@@ -113,6 +148,14 @@ def acquire_all_verified(out_dirs, max_docs=None, max_scan=None, progress_every=
                 print(f"[sangraha:verified] scan cap ({max_scan} rows) hit -- "
                       f"final counts: web={counts['web']} pdf={counts['pdf']} speech={counts['speech']}")
             break
+
+    if flush_every:
+        # Incremental mode: everything already written is durable; just flush
+        # the tails. Deliberately does NOT call write_corpus_docs, which would
+        # rmtree the directory and destroy the shards written during the scan.
+        for t in types:
+            _flush_incremental(t, final=True)
+        return {t: flushed[t] for t in types}
 
     results = {}
     for t in types:

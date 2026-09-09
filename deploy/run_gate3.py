@@ -43,7 +43,11 @@ WARMUP_STEPS_DISCARDED = 20
 
 
 def run_shakedown(nanochat_dir, extra_args):
-    cmd = [sys.executable, "-m", "scripts.base_train"] + cfg.gate3_args() + extra_args
+    # -u is load-bearing: base_train's stdout is a PIPE here, so Python
+    # block-buffers it. If the child dies without flushing (a C-level abort,
+    # os._exit, or a CUDA abort), the buffered tail -- including the
+    # traceback -- is lost, and the failure looks like "exited 1, no output".
+    cmd = [sys.executable, "-u", "-m", "scripts.base_train"] + cfg.gate3_args() + extra_args
     print("+ " + " ".join(cmd) + f"\n  (cwd={nanochat_dir})\n", flush=True)
 
     proc = subprocess.Popen(
@@ -121,10 +125,17 @@ def evaluate(steps, params, flops_per_token, peak_flops):
 
     # --- wall-clock feasibility, which the MFU bar alone does not tell you
     stable_h = cfg.STABLE_STEPS * mean_dt / 3600
-    total_h = cfg.TOTAL_STEPS * mean_dt / 3600
+    # TOTAL_STEP_EQUIVALENTS, not TOTAL_STEPS: the project trains one stable
+    # trajectory but TWO decay branches, so decay steps cost wall-clock twice
+    # while appearing once in a single trajectory's step count.
+    total_h = cfg.TOTAL_STEP_EQUIVALENTS * mean_dt / 3600
     result["projected_stable_hours"] = round(stable_h, 2)
     result["projected_total_hours"] = round(total_h, 2)
-    result["fits_28h_budget"] = total_h <= 28.0
+    result["gpu_hour_ceiling"] = cfg.SPEC_GPU_HOUR_CEILING
+    # Key deliberately NOT named after a literal hour count. The previous
+    # `fits_28h_budget` baked in a figure that later turned out to be a stale
+    # planning estimate, and the name outlived the number (see Bug 14).
+    result["fits_gpu_hour_ceiling"] = total_h <= cfg.SPEC_GPU_HOUR_CEILING
     if mean_dt > cfg.SEC_PER_STEP_RED_FLAG:
         result["red_flag"] = (
             f"{mean_dt:.2f}s/step exceeds the spec's {cfg.SEC_PER_STEP_RED_FLAG}s "
@@ -152,9 +163,36 @@ def evaluate(steps, params, flops_per_token, peak_flops):
     return result
 
 
+def _find_nanochat(explicit=None):
+    """Locate the nanochat repo without assuming the caller's cwd.
+
+    The default used to be the bare relative path "../nanochat", which is only
+    correct when invoked from inside deploy/. Run one directory up -- the
+    natural place, since that is where hindi_env.sh lives -- and it resolved to
+    a sibling of workspaces/ and failed with "nanochat dir not found".
+    Checked in order: explicit flag, $NANOCHAT_DIR, the parent of this file's
+    directory, then $TEAM.
+    """
+    import os
+    candidates = []
+    if explicit:
+        candidates.append(explicit)
+    if os.environ.get("NANOCHAT_DIR"):
+        candidates.append(os.environ["NANOCHAT_DIR"])
+    here = os.path.dirname(os.path.abspath(__file__))
+    candidates.append(os.path.join(os.path.dirname(here), "nanochat"))
+    if os.environ.get("TEAM"):
+        candidates.append(os.path.join(os.environ["TEAM"], "nanochat"))
+    candidates.append("../nanochat")
+    for c in candidates:
+        if c and os.path.isdir(os.path.join(c, "nanochat")):
+            return os.path.abspath(c)
+    return None
+
+
 def main():
     ap = argparse.ArgumentParser(description="Gate 3: MFU shakedown (Requirement 6)")
-    ap.add_argument("--nanochat-dir", default="../nanochat",
+    ap.add_argument("--nanochat-dir", default=None,
                     help="path to the nanochat repo (relative paths are safest on "
                          "this host -- $HOME resolves differently between the "
                          "team02 and usr1-iairo identities)")
@@ -163,10 +201,14 @@ def main():
     ap.add_argument("extra", nargs="*", help="extra flags passed through to base_train")
     args = ap.parse_args()
 
-    if not os.path.isdir(args.nanochat_dir):
-        print(f"GATE 3 FAILED: nanochat dir not found: {args.nanochat_dir}",
+    args.nanochat_dir = _find_nanochat(args.nanochat_dir)
+    if not args.nanochat_dir:
+        print("GATE 3 FAILED: could not locate the nanochat repo. Tried "
+              "--nanochat-dir, $NANOCHAT_DIR, the parent of this script, "
+              "$TEAM/nanochat and ../nanochat. Pass --nanochat-dir explicitly.",
               file=sys.stderr)
         return 1
+    print(f"nanochat repo: {args.nanochat_dir}")
 
     if not args.skip_preflight:
         from training.preflight import main as preflight_main, PreflightError
@@ -196,9 +238,11 @@ def main():
         print(f"  step time:         {result['mean_sec_per_step']}s "
               f"(budget: {result['sec_per_step_budget']}s)")
         print(f"  projected stable:  {result['projected_stable_hours']}h "
-              f"(Requirement 7.1 allows 22.4h)")
+              f"(a from-scratch stable phase; Requirement 7.1 now sizes it at "
+              f"{cfg.STABLE_END_STEPS * cfg.MEASURED_SEC_PER_STEP / 3600:.1f}h)")
         print(f"  projected total:   {result['projected_total_hours']}h "
-              f"(ceiling 28h) -> {'FITS' if result['fits_28h_budget'] else 'OVER BUDGET'}")
+              f"(ceiling {result['gpu_hour_ceiling']}h) -> "
+              f"{'FITS' if result['fits_gpu_hour_ceiling'] else 'OVER BUDGET'}")
     if rec := result.get("requirement_1_4_recompute"):
         print(f"  realized params:   {rec['realized_params']:,} "
               f"({rec['delta_pct']:+}% vs the spec's ~400M)")

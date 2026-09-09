@@ -1,0 +1,35 @@
+{
+  "save_at": 20,
+  "total_steps": 40,
+  "run1_exit_code": 0,
+  "run1_steps_logged": 40,
+  "artifacts": {
+    "checkpoint_dir": "/data1/users/usr1-iairo/hindi_lm_train/base_checkpoints/resume_test",
+    "found": [
+      "model_000020.pt",
+      "optim_000020_rank0.pt"
+    ],
+    "missing": [],
+    "meta_files": [
+      "meta_000020.json",
+      "meta_000040.json"
+    ]
+  },
+  "loss_at_checkpoint": 6.808044,
+  "dataloader_at_checkpoint": {
+    "epoch": 1,
+    "pq_idx": 0,
+    "rg_idx": 0
+  },
+  "run2_exit_code": 0,
+  "run2_steps_logged": 20,
+  "loss_after_resume": 6.713241,
+  "dataloader_after_resume": {
+    "epoch": 1,
+    "pq_idx": 1,
+    "rg_idx": 0
+  },
+  "loss_jump_fraction": -0.0139,
+  "dataloader_advanced": true,
+  "passed": true
+}

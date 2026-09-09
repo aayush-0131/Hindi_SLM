@@ -28,6 +28,54 @@ def normalize_records(records, source, subsource=None):
         }
 
 
+def append_corpus_docs(records, out_dir, prefix, shard_size=50_000,
+                       schema=CORPUS_DOC_SCHEMA, start_idx=0):
+    """Append parquet shards to `out_dir` WITHOUT removing what is already there.
+
+    `write_corpus_docs` is all-or-nothing by design: it stages to a temp dir and
+    `shutil.rmtree`s the destination before renaming in. That is right for a
+    stage that must not be half-applied -- but it makes two things impossible:
+
+      1. crash safety on a long acquisition. A 5-hour Sangraha scan that dies
+         at hour 5 loses everything, because nothing is durable until the end.
+      2. topping up an existing acquisition. A second scan into the same
+         directory DELETES the first scan's output (ROUND2_HANDOFF.md sec 7.12
+         records this biting once already).
+
+    So this variant writes shards as it goes, under a caller-supplied `prefix`
+    that must be unique per run, and never touches existing files. Downstream
+    consumers glob `*.parquet`, so mixed prefixes are read transparently.
+
+    Returns the number of documents written.
+    """
+    os.makedirs(out_dir, exist_ok=True)
+    buf = []
+    shard_idx = start_idx
+    n_written = 0
+
+    def flush():
+        nonlocal buf, shard_idx, n_written
+        if not buf:
+            return
+        table = pa.Table.from_pylist(buf, schema=schema)
+        # Write to a temp name then rename, so a reader globbing *.parquet can
+        # never observe a partially-written shard.
+        final = os.path.join(out_dir, f"{prefix}_{shard_idx:05d}.parquet")
+        tmp = final + f".tmp-{uuid.uuid4().hex[:6]}"
+        pq.write_table(table, tmp)
+        os.rename(tmp, final)
+        n_written += len(buf)
+        shard_idx += 1
+        buf = []
+
+    for rec in records:
+        buf.append(rec)
+        if len(buf) >= shard_size:
+            flush()
+    flush()
+    return n_written
+
+
 def write_corpus_docs(records, out_dir, shard_size=50_000, schema=CORPUS_DOC_SCHEMA):
     """
     Writes `records` (dicts matching `schema`) to parquet shards under a fresh

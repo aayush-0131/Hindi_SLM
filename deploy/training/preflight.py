@@ -214,7 +214,11 @@ def main():
     print("\n# Stable phase -- resume after the window boundary (Requirement 7.7)")
     print(f"python -m scripts.base_train {' '.join(cfg.stable_args(resume_from_step='<LAST_SAVED_STEP>'))}")
     print("\n# Decay A / Decay B (Requirements 7.3 / 7.4)")
-    print("#   first: cp base_checkpoints/stable/*022400* into base_checkpoints/decay_{a,b}/")
+    # Derived, not hardcoded: this read *022400* long after STABLE_STEPS moved
+    # to 27,000, so it named a checkpoint the decay commands below would not
+    # then find.
+    print(f"#   first: cp base_checkpoints/stable/*{cfg.STABLE_STEPS:06d}* "
+          f"into base_checkpoints/decay_{{a,b}}/")
     print(f"python -m scripts.base_train {' '.join(cfg.decay_args('a'))}")
     print(f"python -m scripts.base_train {' '.join(cfg.decay_args('b'))}")
     print()

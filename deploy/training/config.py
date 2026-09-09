@@ -52,17 +52,138 @@ ARCH_DEVIATIONS = [
 SPEC_PARAM_TARGET = 400_000_000
 
 # ---------------------------------------------------------------- token budget
-# research.md's windowed-GPU-access recompute: C_new ~= 3.53e19 FLOPs,
-# D_new ~= 14.7B total at N = 400M, split 80/20 stable/decay.
+#
+# PLAN C, 2026-09-06 (project owner's decision). Two prior revisions of this
+# block are worth knowing about so the numbers are not re-derived wrongly a
+# third time:
+#
+#  1. It carried TOTAL_STEPS = 28_000, a planning estimate made BEFORE Gate 3
+#     measured the real step time. The launched run used 30,500.
+#  2. It then capped pretraining at Requirement 7.6's 28 GPU-hours. That
+#     figure turned out to be STALE, not a hardware limit -- research.md
+#     derived it mid-Round-1 as "~34h remaining minus ~6h for prep", where the
+#     ~34h was measured from a point already inside window 1 and so excluded
+#     the ~6h of window 1 already spent. The actual allocation is two 20-hour
+#     windows = 40 h, exactly the ORIGINAL ceiling in requirements.md line 12,
+#     and the 6 h prep reserve has since been spent (Gate 1, Gate 3, corpus,
+#     pipeline all done). Requirement 7.6 is therefore re-derived here under
+#     the mechanism Requirement 1.4 provides for exactly this.
+#
+# The binding constraint in Round 2 is the 20-hour WINDOW, not a GPU-hour cap:
+# ~6 h of it is needed for Gate 2, decay-variant evaluation, SFT and the demo,
+# leaving ~14 h for pretraining.
 TOTAL_BATCH_TOKENS = 524_288   # Requirement 1.2 (2^19)
 DEVICE_BATCH_SIZE = 32         # spec's micro-batch; drop to 16/8 only on OOM
 
-D_TOTAL_TOKENS = 14_700_000_000
-TOTAL_STEPS = round(D_TOTAL_TOKENS / TOTAL_BATCH_TOKENS / 100) * 100   # 28,000
-DECAY_FRACTION = 0.20                                                  # Requirement 7.5
-STABLE_STEPS = round(TOTAL_STEPS * (1 - DECAY_FRACTION))               # 22,400
-DECAY_STEPS = TOTAL_STEPS - STABLE_STEPS                               # 5,600 total
-DECAY_STEPS_PER_VARIANT = DECAY_STEPS // 2                             # 2,800 each
+# MEASURED, not assumed: Gate 3 re-run 2026-09-07 on torch 2.14.0+cu130 after
+# the venv rebuild, giving 51.14% MFU / 3.319 s/step (Round 1 on torch 2.9.1
+# was 52-53% / 3.20-3.25 s). The re-measurement mattered: the whole Plan C
+# budget rests on this number, and the torch version changed underneath it.
+MEASURED_SEC_PER_STEP = 3.319
+# Round 1's recorded training time AT THE RESUME STEP (meta_022000.json
+# loop_state.total_training_time). Was 67,961.98 for step 21,200.
+ROUND1_GPU_SECONDS = 70_523.09
+# Step 22,000, not 21,200. ROUND2_HANDOFF.md sec 6.1 concluded 21,200 because
+# optim_022000_rank0.pt "NEVER TRANSFERRED" to the laptop -- but on 2026-09-06
+# it was found intact ON THE SERVER (3,795,102,997 bytes) alongside
+# model_022000.pt and meta_022000.json. It was never missing, only never
+# downloaded, and the earlier "nothing survived the purge" reading was a
+# team02-vs-usr1-iairo permissions artifact. Resuming here recovers 800 steps
+# (~43 min) and starts from val bpb 0.34967 rather than 0.35047 -- the best
+# weights Round 1 produced.
+RESUME_FROM_STEP = 22_000
+SPEC_GPU_HOUR_CEILING = 40.0       # requirements.md line 12, the real ceiling
+
+# What Round 1 actually launched with. Kept because it determines the LR the
+# model has ALREADY seen, which is what the safety assertion below checks.
+ROUND1_NUM_ITERATIONS = 30_500
+DECAY_FRACTION = 0.20              # Requirement 7.5's 20% decay phase
+
+# --- Plan C: extend the stable phase onto a GROWN corpus --------------------
+# Round 1's stable phase would have ended at 24,400 = 4.09 epochs over a 3.13B
+# corpus -- AT the ~4-epoch repetition ceiling, i.e. repetition-limited rather
+# than compute-limited. The corpus uses only 7.5% of the ~42B available in the
+# seven already-chosen sources, so growing it is nearly free (add_fineweb2.py
+# streams ~7,000 docs/sec). Extending stable onto fresh data is a more reliable
+# gain than a longer decay, whose supply is dominated by never-inspected OCR'd
+# Sangraha PDF.
+# 26,800, NOT 27,000. --save-every=400 only checkpoints at multiples of 400,
+# and 27,000 is not one (27000/400 = 67.5) -- the nearest are 26,800 and
+# 27,200. The stable run was launched with --num-iterations=33750, which puts
+# warmdown_start at exactly 27,000, so step 27,200 is already 200 steps INTO
+# the anneal: branching a decay variant from it would give the model a
+# decaying LR followed by a jump back to 1.0. 26,800 is a real checkpoint and
+# is still fully in the flat-LR region. Cost of the 200 steps: 0.18 h.
+STABLE_END_STEPS = 26_800
+TARGET_CORPUS_TOKENS = 8_000_000_000   # grow to ~8B before resuming
+
+# num_iterations chosen so warmdown_start lands exactly on STABLE_END_STEPS
+# while keeping Requirement 7.5's 0.20 ratio.
+# The LAUNCHED value, not derived from STABLE_END_STEPS. The run is already
+# training with --num-iterations=33750; changing it now would alter the LR
+# schedule mid-run. Warmdown therefore starts at 27,000 while we stop at
+# 26,800 -- the run simply ends 200 steps before its anneal would begin,
+# which is what leaves a flat checkpoint to branch from.
+STABLE_NUM_ITERATIONS = 33_750
+
+# --- decay variants ---------------------------------------------------------
+# Sized to what the decay DATA actually supports at low upsampling, rather
+# than to whatever fills the clock.
+DECAY_STEPS_PER_VARIANT = 4_500
+DECAY_STEPS = DECAY_STEPS_PER_VARIANT * 2
+DECAY_NUM_ITERATIONS = STABLE_END_STEPS + DECAY_STEPS_PER_VARIANT      # 31,500
+DECAY_WARMDOWN_RATIO = DECAY_STEPS_PER_VARIANT / DECAY_NUM_ITERATIONS
+
+# Retained for the Requirement 1.4 recompute in run_gate3.py.
+TOTAL_STEPS = STABLE_END_STEPS + DECAY_STEPS_PER_VARIANT   # one trajectory
+STABLE_STEPS = STABLE_END_STEPS       # back-compat alias
+D_TOTAL_TOKENS = TOTAL_STEPS * TOTAL_BATCH_TOKENS
+
+# --- safety assertions ------------------------------------------------------
+# THE critical one. Raising num_iterations is only safe because nanochat's
+# get_lr_multiplier returns exactly 1.0 for every step between warmup and
+# warmdown_start. Every step already trained (<= RESUME_FROM_STEP) sat in that
+# flat region under Round 1's config and must STILL sit in it under the new
+# one -- otherwise the completed trajectory would be retroactively
+# inconsistent with the schedule and the model would end up mis-annealed.
+_round1_warmdown_start = ROUND1_NUM_ITERATIONS * (1 - DECAY_FRACTION)   # 24,400
+_new_warmdown_start = STABLE_NUM_ITERATIONS * (1 - DECAY_FRACTION)      # 27,000
+assert RESUME_FROM_STEP < _round1_warmdown_start, (
+    f"step {RESUME_FROM_STEP} was already inside Round 1's warmdown "
+    f"({_round1_warmdown_start}); its LR was NOT flat and the schedule cannot "
+    f"be extended without mis-annealing the model")
+assert RESUME_FROM_STEP < _new_warmdown_start, (
+    "resume step must remain in the flat-LR region under the new schedule")
+assert STABLE_END_STEPS <= _new_warmdown_start, (
+    f"stable must STOP at or before warmdown_start ({_new_warmdown_start:.0f}), "
+    f"or the branch checkpoint is already partly annealed")
+assert STABLE_END_STEPS % 400 == 0, (
+    f"STABLE_END_STEPS={STABLE_END_STEPS} is not a multiple of --save-every=400, "
+    f"so no checkpoint would exist there to branch the decay variants from")
+assert abs(DECAY_NUM_ITERATIONS * (1 - DECAY_WARMDOWN_RATIO)
+           - STABLE_END_STEPS) < 1.0, (
+    "decay warmdown must start exactly at STABLE_END_STEPS, or the LR jumps "
+    "at the branch point")
+
+TOTAL_PRETRAIN_GPU_HOURS = (
+    ROUND1_GPU_SECONDS
+    + (STABLE_END_STEPS - RESUME_FROM_STEP) * MEASURED_SEC_PER_STEP
+    + DECAY_STEPS * MEASURED_SEC_PER_STEP) / 3600
+assert TOTAL_PRETRAIN_GPU_HOURS <= SPEC_GPU_HOUR_CEILING, (
+    f"plan needs {TOTAL_PRETRAIN_GPU_HOURS:.2f} h against the spec's "
+    f"{SPEC_GPU_HOUR_CEILING} h ceiling")
+
+# Round 2 window accounting, so the plan is checkable against the real limit.
+ROUND2_WINDOW_HOURS = 20.0
+ROUND2_NON_PRETRAIN_RESERVE_HOURS = 6.0   # Gate 2, decay eval, SFT, demo
+ROUND2_PRETRAIN_HOURS = (
+    (STABLE_END_STEPS - RESUME_FROM_STEP) + DECAY_STEPS
+) * MEASURED_SEC_PER_STEP / 3600
+assert ROUND2_PRETRAIN_HOURS <= (
+    ROUND2_WINDOW_HOURS - ROUND2_NON_PRETRAIN_RESERVE_HOURS), (
+    f"Round 2 pretraining needs {ROUND2_PRETRAIN_HOURS:.2f} h but only "
+    f"{ROUND2_WINDOW_HOURS - ROUND2_NON_PRETRAIN_RESERVE_HOURS:.2f} h of the "
+    f"window is available after the eval/SFT/demo reserve")
 
 # ------------------------------------------------------------------- schedules
 # nanochat's get_lr_multiplier(it) is a pure function of
@@ -98,7 +219,17 @@ SAMPLE_EVERY = STABLE_STEPS // 4   # 5,600 -> lands on 25/50/75/100% of stable
 # ------------------------------------------------------------------- Gate 3
 MFU_PASS_THRESHOLD = 35.0     # Requirement 6.3, percent
 GATE3_STEPS = 60              # enough to clear warmup+compile and average cleanly
-SEC_PER_STEP_BUDGET = 3.6     # TOTAL_STEPS in 28 GPU-hours
+# Derived, not hardcoded: the old literal 3.6 was computed against the stale
+# TOTAL_STEPS = 28,000 and silently became wrong when the live run used 30,500.
+#
+# Divide by TOTAL_STEP_EQUIVALENTS, not TOTAL_STEPS. The project trains ONE
+# stable trajectory but TWO decay branches, so the decay steps are paid for
+# twice in wall-clock while appearing once in a single trajectory's step count.
+# Using TOTAL_STEPS here yielded 4.571 s/step -- a "budget" looser than the
+# spec's own 4.5 s/step sub-30%-MFU red flag, i.e. meaningless as a bar.
+TOTAL_STEP_EQUIVALENTS = STABLE_END_STEPS + DECAY_STEPS      # 36,000
+SEC_PER_STEP_BUDGET = round(
+    SPEC_GPU_HOUR_CEILING * 3600 / TOTAL_STEP_EQUIVALENTS, 3)   # 4.0
 SEC_PER_STEP_RED_FLAG = 4.5   # spec's own sub-30%-MFU red flag
 
 
@@ -133,16 +264,23 @@ def stable_args(resume_from_step=None):
     """
     Requirement 7.1: the stable phase.
 
-    num_iterations is TOTAL_STEPS (not STABLE_STEPS) with warmdown_ratio 0.20, so
-    the LR is flat across every stable step and the warmdown begins exactly at
-    STABLE_STEPS. The run is simply stopped at STABLE_STEPS; the decay variants
-    then pick that checkpoint up. Setting num_iterations=STABLE_STEPS instead
-    would decay the LR *inside* the stable phase and there would be no flat
-    checkpoint to branch the two variants from.
+    num_iterations is STABLE_NUM_ITERATIONS (33,750), NOT TOTAL_STEPS, with
+    warmdown_ratio 0.20 -- so the LR stays flat across every stable step and
+    the warmdown begins exactly at STABLE_END_STEPS (27,000). The run is simply
+    stopped at STABLE_END_STEPS; both decay variants then branch from that
+    checkpoint. Setting num_iterations=STABLE_END_STEPS instead would decay the
+    LR *inside* the stable phase, leaving no flat checkpoint to branch from.
+
+    Note this is a LARGER num_iterations than Round 1 launched with (30,500 ->
+    33,750), which extends the stable phase from 24,400 to 27,000 steps. That
+    is safe only because every already-trained step sits in the flat-LR region
+    under both configs -- asserted at module import, not assumed. Confirm
+    empirically on the resume test: base_train should print `lrm: 1.00` at the
+    resumed step.
     """
     args = _common_args() + [
-        f"--num-iterations={TOTAL_STEPS}",
-        f"--warmdown-ratio={WARMDOWN_RATIO_STABLE}",
+        f"--num-iterations={STABLE_NUM_ITERATIONS}",
+        f"--warmdown-ratio={DECAY_FRACTION}",
         f"--save-every={SAVE_EVERY}",
         f"--eval-every={EVAL_EVERY}",
         f"--eval-tokens={EVAL_TOKENS}",
@@ -168,14 +306,18 @@ def decay_args(variant):
     --model-tag, so a differently-tagged run will not see the stable output.
     """
     assert variant in ("a", "b"), variant
-    n_iters = STABLE_STEPS + DECAY_STEPS_PER_VARIANT
+    # Single-sourced from the module constants, which assert that warmdown
+    # begins exactly at STABLE_STEPS.
     return _common_args() + [
-        f"--num-iterations={n_iters}",
-        f"--warmdown-ratio={DECAY_STEPS_PER_VARIANT / n_iters:.6f}",
+        f"--num-iterations={DECAY_NUM_ITERATIONS}",
+        f"--warmdown-ratio={DECAY_WARMDOWN_RATIO:.6f}",
         f"--resume-from-step={STABLE_STEPS}",
         f"--save-every={SAVE_EVERY}",
         f"--eval-every={EVAL_EVERY}",
         f"--eval-tokens={EVAL_TOKENS}",
-        f"--sample-every={SAMPLE_EVERY}",
+        # SAMPLE_EVERY is scaled to the stable phase (6,100 steps), which is
+        # LONGER than a decay variant (3,452) -- using it here would take no
+        # samples at all and quietly drop Requirement 9.3 for the decay phase.
+        f"--sample-every={max(1, DECAY_STEPS_PER_VARIANT // 4)}",
         f"--model-tag=decay_{variant}",
     ]

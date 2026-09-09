@@ -1,0 +1,38 @@
+{
+  "model_tag": "stable",
+  "step": 33750,
+  "smoke_test": false,
+  "results": {
+    "community_arc_hin_mcf:easy|0": {
+      "acc": 0.2563131313131313,
+      "n": 2376,
+      "correct": 609,
+      "verdict": "DEGENERATE"
+    },
+    "community_arc_hin_mcf:challenge|0": {
+      "acc": 0.24829351535836178,
+      "n": 1172,
+      "correct": 291,
+      "verdict": "DEGENERATE"
+    },
+    "community_boolq_hin|0": {
+      "acc": 0.5685015290519878,
+      "n": 3270,
+      "correct": 1859,
+      "verdict": "DEGENERATE"
+    },
+    "community_hellaswag_hin_mcf|0": {
+      "acc": 0.2530372435769767,
+      "n": 10042,
+      "correct": 2541,
+      "verdict": "DEGENERATE"
+    },
+    "belebele_hin_Deva_mcf|0": {
+      "acc": 0.27444444444444444,
+      "n": 900,
+      "correct": 247,
+      "verdict": "DEGENERATE"
+    }
+  },
+  "aggregate_acc": 0.32011797274898046
+}
