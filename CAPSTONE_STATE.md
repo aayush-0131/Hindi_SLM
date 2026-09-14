@@ -2,7 +2,7 @@
 
 **Project:** IAIRO PRAMANA SLM++ Bootcamp Capstone  
 **Repository:** `aayush-0131/Hindi_SLM`  
-**Canonical state timestamp:** 2026-09-14 12:27 IST  
+**Canonical state timestamp:** 2026-09-15 (after midnight IST)  
 **Hard submission deadline:** 2026-09-16 00:00 IST  
 **Purpose of this file:** single source of truth for project state across long chats, machines, and fresh sessions. Read this file before making strategic or execution decisions.
 
@@ -24,6 +24,7 @@
 - **Do not change the frozen benchmark during model selection.** Any correction after freeze requires a new benchmark version and new hashes.
 - **Do not use hidden benchmark items during iterative model selection or SFT data creation.**
 - **Do not publish weights, submit externally, purchase compute, or make a major model/domain strategy change without explicit approval.**
+- **Do not load Stable-33750 on the 8 GB Mac again.** Use the Mac only as control/artifact/documentation machine.
 
 ---
 
@@ -55,6 +56,8 @@
 
 **Interpretation:** Stable-33750 is a **base/pretrained completion model**, not an instruction/chat model and not safe for unrestricted deployment.
 
+The architecture is not a clean GPT-2/Llama clone. Important custom components include value embeddings/gates, residual/x0 scalars, smear/backout terms, RoPE + QK norm and ReLU² MLPs. Do not perform a lossy rename-only conversion into GPT-2 or Llama.
+
 ---
 
 ## 3. Rescued model artifacts and canonical hashes
@@ -74,13 +77,45 @@ Critical files:
 | `tokenizer/tokenizer.pkl` | `25be857870b2cebbc1dfc729738d6e03dd1399821cdeb1d1d85a86be6ab59823` |
 | `tokenizer/token_bytes.pt` | `96e1e74bbbfae0c277a5b8644f64487325745ed2f26cf3a3a267271c98999234` |
 
-The four critical artifacts were uploaded to the Google Drive folder:
+The four critical artifacts were uploaded to the private Google Drive folder:
 
 ```text
 Hindi_SLM_Capstone_Submission
 ```
 
-Remote/cloud execution should verify these hashes before evaluation or SFT.
+### Lightning rescue status — COMPLETE
+
+Lightning organization/project: **Hindi SLM Capstone**  
+Studio: **`sudden-teal-clz7`**
+
+Persistent artifact root:
+
+```text
+/teamspace/studios/this_studio/artifacts/
+```
+
+The large checkpoint upload was resumed over SSH after a browser-upload interruption. The remote partial file was verified as an exact prefix of the local canonical file, then the missing tail was appended. Final remote size is **2,661,366,058 bytes** and final SHA-256 matches the canonical model hash exactly:
+
+```text
+1ad56ea60a5e28d6899146a56f63b1833837dbe6f6cef9128bb2bf4a51faa00d
+```
+
+Runtime layout:
+
+```text
+~/hindi_slm_runtime/tokenizer/tokenizer.pkl
+~/hindi_slm_runtime/tokenizer/token_bytes.pt
+~/hindi_slm_runtime/ckpt_stable_final/model_033750.pt
+~/hindi_slm_runtime/ckpt_stable_final/meta_033750.json
+```
+
+A base-loader symlink is also present:
+
+```text
+~/hindi_slm_runtime/base_checkpoints/stable -> ~/hindi_slm_runtime/ckpt_stable_final
+```
+
+Tokenizer runtime test passed and meta-device architecture reconstruction produced the exact **910,690,922** parameter count.
 
 ---
 
@@ -88,7 +123,7 @@ Remote/cloud execution should verify these hashes before evaluation or SFT.
 
 - Tokenizer: byte-level BPE
 - Vocabulary: **32,768**
-- Devanagari-aware regex optimization includes `[` + `\p{L}\p{M}` + `]+`
+- Devanagari-aware tokenizer logic is present in the repository.
 - Historical tokenizer fertility: approximately **1.23**
 - Pretraining corpus: approximately **3.13B unique tokens** in Round 1
 - Approximately **127 parquet shards** (126 train + 1 validation)
@@ -107,11 +142,11 @@ Qualitative generation from Stable-33750 exposed explicit sexual/adult continuat
 
 - no full pretraining rerun;
 - document the issue transparently;
+- include explicit safety-aligned examples in SFT;
 - create explicit safety evaluation prompts;
-- include safety-aligned examples in SFT;
 - compare Base vs Instruct safety behavior;
-- add inference/demo guardrails;
-- release/describe base and instruct models separately;
+- add inference/demo guardrails if time permits;
+- describe base and instruct models separately;
 - do not claim the raw base model is deployment-safe.
 
 ---
@@ -160,136 +195,311 @@ Supporting facts:
 
 ### Freeze policy
 
-During training/model selection, do not change:
-
-- wording;
-- answers;
-- difficulty labels;
-- dev/hidden split;
-- reference answers;
-- grading rubrics.
-
-If a correction is unavoidable, create **HistoryBench-HI v1.1** (or later) with fresh hashes and document the change.
+During training/model selection, do not change wording, answers, difficulty labels, split, reference answers or grading rubrics. If a correction is unavoidable, create **HistoryBench-HI v1.1** (or later) with fresh hashes and document the change.
 
 ### Leakage policy
 
 - Do not feed benchmark questions, reference answers, hidden items, or benchmark-derived prompts into SFT data generation.
-- After the final SFT corpus is created, run an n-gram contamination scan against **all 100 benchmark items** before training/final reporting.
-- Hidden 25 should be used only for the final locked model comparison, not iterative tuning.
+- Hidden 25 is for the final locked model only, never iterative model selection.
+- Final reporting still requires a contamination audit against all 100 items; merely possessing the hidden set for this audit must not turn it into tuning data.
+
+### Known v1 benchmark limitation discovered after freeze
+
+The DEV MCQ answer key is strongly answer-position imbalanced:
+
+```text
+Gold B: 41 / 55
+Gold C:  7 / 55
+Gold A:  7 / 55
+Gold D:  0 / 55
+```
+
+Because the benchmark was already frozen before SFT, **do not silently rebalance v1**. Report this limitation explicitly. HistoryBench-HI v1 remains useful for paired Base-vs-Instruct comparison and open-ended reasoning assessment, but raw MCQ accuracy must not be described as if the answer positions were balanced.
 
 ---
 
-## 8. Evaluation methodology
+## 8. Stable-33750 DEV baseline — COMPLETE
 
-### DEV baseline
+HistoryBench DEV baseline successfully ran on Lightning using **Tesla T4 / FP16 engineering fallback**.
 
-- Run on Stable-33750 before SFT.
-- MCQ: zero-shot conditional mean token loss over A/B/C/D choices using native NanoChat evaluation utilities.
-- Open-ended: generate deterministic/locked outputs and save for later blind rubric judging.
-- Save prompts, outputs, scores, environment metadata, precision, code commit, and benchmark hash.
+Environment:
 
-### Final comparison
+```text
+PyTorch 2.8.0+cu128
+CUDA available: True
+GPU: Tesla T4
+NANOCHAT_DTYPE=float16
+```
+
+The checkpoint loaded successfully, MCQ conditional-loss scoring completed, and all 20 open-ended generations completed.
+
+### MCQ results
+
+```text
+15 / 55 = 0.272727...
+Easy:   6 / 25 = 0.2400
+Medium: 9 / 30 = 0.3000
+```
+
+By subdomain:
+
+| Subdomain | Accuracy |
+|---|---:|
+| Ancient India | 3/11 = 27.27% |
+| Art, Architecture & Heritage | 4/11 = 36.36% |
+| Literature, Society & Cultural Traditions | 1/11 = 9.09% |
+| Medieval India | 5/11 = 45.45% |
+| Modern India & Freedom Movement | 2/11 = 18.18% |
+
+Model answer-position behavior:
+
+```text
+Predictions: B=26, A=11, C=10, D=8
+Gold:        B=41, C=7, A=7, D=0
+Gold A correct: 0/7
+Gold B correct: 15/41
+Gold C correct: 0/7
+```
+
+The raw 27.27% score must **not** be described as simply "above 25% chance" because the gold labels are highly imbalanced.
+
+### Open-ended baseline behavior
+
+All **20/20** DEV open-ended responses were generated. The first inspected hard examples showed a clear base-model failure mode: the model repeatedly copied/rephrased the prompt instead of answering and entered repetition loops. This is consistent with Stable-33750 being a pretrained completion model rather than an instruction model.
+
+Saved under:
+
+```text
+~/Hindi_SLM/results/historybench/base_33750/
+```
+
+including `summary.json`, `predictions.jsonl`, `open_ended_for_judging.jsonl`, and `run.log`.
+
+### Precision caveat
+
+Base training was BF16 on H200, while this DEV baseline was FP16 on a T4 because free BF16-capable compute was unavailable without adding a payment method. Treat the current run as the saved engineering baseline and **report the precision mismatch explicitly**. If a BF16-capable GPU becomes available in time, a precision-matched rerun is desirable, but do not purchase compute without approval.
+
+The Hidden-25 has **not** been used for model selection or iterative evaluation.
+
+---
+
+## 9. SFT dataset v1 — CREATED AND VALIDATED
+
+Current SFT seed package:
+
+```text
+History_HI_SFT_v1_seed_package.zip
+```
+
+Package SHA-256:
+
+```text
+9d78b9a9fce9c3a8d7343195ea1c49a848b1c63214c445fb8cfdadef09587f0f
+```
+
+Installed in Lightning under:
+
+```text
+~/Hindi_SLM/data/history_hi_sft_v1/
+```
+
+Dataset sizes:
+
+```text
+Train: 275 conversations
+Val:    36 conversations
+Total: 311 conversations
+```
+
+Training data includes:
+
+- Hindi-first domain QA across all five subdomains;
+- explicit direct-answer / anti-repetition behavior;
+- balanced A/B/C/D MCQ answer-position practice;
+- epistemic calibration / do-not-invent behavior;
+- generic safety-aligned examples, including refusal/redirection for explicit sexual-content steering and avoidance of insulting/hateful framing.
+
+This dataset was created independently of HistoryBench question wording; hidden benchmark items were not used to generate it.
+
+### DEV contamination scan
+
+Exact 8-gram scan against the frozen DEV-75:
+
+```text
+train_rows=275 benchmark_rows=75 n=8
+rows_with_overlap=0
+STATUS=PASS_NO_EXACT_NGRAM_OVERLAP
+```
+
+This is a DEV-only pretraining gate. A final audit against all 100 frozen items is still required for submission reporting.
+
+### Tokenization validation
+
+All 311 conversations rendered through the real NanoChat tokenizer successfully.
+
+Train:
+
+```text
+min_tokens: 30
+median_tokens: 52
+p95_tokens: 128
+max_tokens: 134
+```
+
+Validation:
+
+```text
+min_tokens: 30
+median_tokens: 51
+p95_tokens: 66
+max_tokens: 67
+```
+
+Therefore **`max_seq_len=256` is sufficient for every current SFT conversation** and is preferred for the T4 memory test/training attempt instead of wasting VRAM at 2048.
+
+---
+
+## 10. Custom SFT integration status
+
+Custom task module installed:
+
+```text
+nanochat/tasks/history_hi_sft.py
+```
+
+Custom trainer currently present and syntax-validated:
+
+```text
+nanochat/scripts/chat_sft_history.py
+```
+
+It is wired to:
+
+```python
+HistoryHiSFT(split="train")
+HistoryHiSFT(split="val")
+```
+
+and no longer uses the default SmolTalk/MMLU/GSM8K mixture for this capstone SFT run.
+
+**Important implementation warning:** the packaged helper `tools/make_history_sft_script.py` generated literal `\n` sequences in the replacement block and produced an invalid trainer on first use. The current `chat_sft_history.py` was manually rebuilt correctly and `python -m py_compile` passed. **Do not rerun `tools/make_history_sft_script.py` until that helper itself is fixed**, or it may regenerate the broken trainer.
+
+---
+
+## 11. Current compute environment and exact blocker
+
+Primary remote environment is Lightning Studio `sudden-teal-clz7`.
+
+Last confirmed GPU:
+
+```text
+Tesla T4
+PyTorch 2.8.0+cu128
+CUDA: True
+```
+
+Lightning can auto-sleep after roughly 10 minutes of inactivity, so verify the machine/GPU before every long run.
+
+A 1-step native full-SFT smoke test was prepared with:
+
+```text
+model: Stable-33750
+precision: FP16 fallback
+max_seq_len: 256
+device_batch_size: 1
+total_batch_size: 256
+num_iterations: 1
+load_optimizer: 0
+chatcore: disabled
+```
+
+The test **did not reach model loading or GPU memory allocation** because it failed immediately at import time:
+
+```text
+ModuleNotFoundError: No module named 'wandb'
+```
+
+### CURRENT BLOCKER
+
+Install `wandb` in the Lightning cloudspace environment, verify import, then rerun the exact 1-step SFT smoke test. The next command should be:
+
+```bash
+python -m pip install -q wandb && python -c "import wandb; print('WANDB_IMPORT=PASS', wandb.__version__)"
+```
+
+Only after that rerun the 1-step SFT memory smoke. The outcome decides strategy:
+
+- **If full native SFT fits T4 16 GB:** proceed with short native SFT using `max_seq_len=256` and carefully chosen steps/LRs.
+- **If CUDA OOM:** immediately switch to a memory-efficient tuning approach; do not spend hours repeatedly trying full SFT settings.
+
+The previous plan to require a BF16-capable GPU before doing anything is **superseded by deadline reality**. T4/FP16 is now the available engineering fallback. Precision mismatch must be disclosed; paid compute still requires explicit approval.
+
+---
+
+## 12. New mandatory Hugging Face submission requirement
+
+A new bootcamp instruction arrived after baseline/SFT setup:
+
+> Final model submission must be loadable using `AutoModelForCausalLM.from_pretrained()` and `AutoTokenizer.from_pretrained()` without a manual conversion step at evaluation time. The submitted checkpoint files and HF weights link must point to the same final `output_dir`.
+
+Required final-export checks include:
+
+- wrap the custom NanoChat architecture as a Hugging Face `PreTrainedModel` / `PretrainedConfig` implementation rather than performing a lossy GPT-2/Llama rename;
+- load and map final trained state dict;
+- `model.save_pretrained(output_dir)`;
+- `tokenizer.save_pretrained(output_dir)`;
+- set tokenizer `pad_token` / `pad_token_id` explicitly (or documented EOS fallback if required);
+- ensure `config.json` `vocab_size` is exactly **32768**;
+- verify a clean reload from the final folder with `AutoModelForCausalLM.from_pretrained(...)` and `AutoTokenizer.from_pretrained(...)`;
+- preferably use safetensors for final weights if practical;
+- run native-NanoChat vs HF-wrapper parity checks before accepting the conversion.
+
+Because the architecture contains custom modules/features, do **not** assume GPT-2/Llama key renaming is sufficient. Build a faithful wrapper.
+
+One contract detail remains to verify with the organizers/evaluator: whether custom model code may require `trust_remote_code=True`. Their instruction explicitly allows wrapping a custom architecture as a `PreTrainedModel`, so a custom HF implementation is the intended route, but the final clean-load command must match the evaluator's actual contract.
+
+HF export is now **rubric-critical**, not optional. Prototype the wrapper before the final submission window, but do not let it block the immediate SFT memory test.
+
+---
+
+## 13. Mac incident and local-compute decision
+
+Machine: Apple Silicon MacBook Air with **8 GB unified memory**.
+
+The first native MPS smoke test kernel-panicked/restarted after reaching model load. The panic report showed watchdog timeout and low swap headroom. NanoChat converts BF16 weights to FP32 on CPU/MPS, which is unsafe for this machine at ~910M parameters.
+
+**Decision:** never load Stable-33750 on the Mac again.
+
+Use the Mac for:
+
+- SSH/control/browser;
+- artifact transfer;
+- documentation;
+- Git/Drive operations;
+- lightweight data preparation.
+
+Use remote NVIDIA GPU for model loading, SFT and inference/evaluation.
+
+---
+
+## 14. Post-training evaluation strategy
 
 At minimum:
 
-1. Stable-33750 Base on DEV
-2. Final instruction/domain/safety-tuned model on DEV
-3. Final locked model on Hidden-25
-4. Safety comparison Base vs Instruct
-5. General/instruction capability checks required by bootcamp rubric
+1. Stable-33750 Base on DEV — **done**.
+2. Final instruction/domain/safety-tuned model on DEV.
+3. Compare Base vs Instruct safety behavior.
+4. Run required general/instruction capability checks.
+5. Lock the final model.
+6. Run Hidden-25 **once** on the locked final model only.
+7. Judge open-ended outputs using the frozen rubric; do not derive scores from vibes.
+8. Document HistoryBench answer-position imbalance and T4/FP16 precision caveat.
 
 Do not use hidden performance to select checkpoints.
 
 ---
 
-## 9. Current local-compute incident and decision
-
-### Mac incident
-
-Machine: Apple Silicon MacBook Air with **8 GB unified memory**.
-
-The first native MPS smoke test reached:
-
-```text
-[HistoryBench] loading model...
-```
-
-and the machine kernel-panicked/restarted. The panic report showed a watchdog timeout and low swap headroom.
-
-NanoChat's checkpoint loader converts BF16 model tensors to FP32 when loading on CPU/MPS. On an 8 GB unified-memory machine this creates unacceptable memory pressure for a ~910M model.
-
-**Decision:** do not attempt another full Stable-33750 load on the Mac.
-
-Use the Mac for:
-
-- control/SSH/browser;
-- artifact handling;
-- documentation;
-- Git/Drive operations;
-- lightweight data preparation.
-
-Use remote NVIDIA GPU for:
-
-- base evaluation;
-- SFT;
-- final inference/evaluation.
-
----
-
-## 10. Current remote GPU status
-
-Google Colab Free currently assigned:
-
-- GPU: **Tesla T4**
-- Compute capability: **7.5 (SM75)**
-- VRAM: **~14.6 GB**
-
-NanoChat auto-selects BF16 on CUDA SM80+; the T4 is pre-Ampere and does not provide the canonical BF16 path expected for this project.
-
-**Current decision:**
-
-- T4 may be retained as an emergency engineering/smoke option only if explicitly chosen;
-- do **not** use T4 numbers as the canonical evaluation while the intake requires evaluation precision to match training;
-- first seek a free/available **SM80+** GPU (examples: L4, A10/A40/A5000/A6000, A100, H100/H200);
-- do not purchase compute without explicit approval.
-
-**Current blocker:** obtaining a valid BF16-capable remote GPU for the canonical Stable-33750 baseline and subsequent SFT.
-
----
-
-## 11. Post-training strategy
-
-Goal: produce an instruction/domain/safety-tuned model without rerunning pretraining.
-
-Preferred sequence:
-
-1. Run and save Stable-33750 baseline.
-2. Build Hindi domain/instruction/safety SFT corpus with strict benchmark leakage isolation.
-3. Run contamination scan against HistoryBench-HI v1.
-4. Fine-tune from Stable-33750 on remote GPU.
-5. Log SFT properly: step, train loss, validation loss where applicable, LR, pre-clip grad norm, clip status, tokens seen, wall time/timestamps, precision, batch/accumulation, seed, GPU, dependency versions, save events.
-6. Compare Base vs Instruct on DEV + safety/general capability.
-7. Lock final model.
-8. Run Hidden-25 once on the final locked model.
-
-NanoChat's native `chat_sft.py` can load a base checkpoint with a fresh optimizer. Parameter-efficient tuning is desirable only if integration is reliable under the deadline; do not spend hours building a custom LoRA bridge if a short native SFT is simpler on adequate hardware.
-
----
-
-## 12. Optional differentiator: Knowledge-Graph guardrail
-
-After the SFT/evaluation critical path is secure, build a compact Indian History/Cultural Heritage KG demonstration:
-
-- neural model handles language;
-- graph supplies explicit factual triples;
-- graph can ground prompts before generation;
-- generated claims can be marked supported / contradicted / unverifiable afterward.
-
-This is a differentiator, **not a blocker for SFT**.
-
----
-
-## 13. Required submission/reproducibility artifacts
+## 15. Required submission/reproducibility artifacts
 
 Bootcamp intake expects, at minimum:
 
@@ -309,36 +519,51 @@ Bootcamp intake expects, at minimum:
 - SFT method/dataset;
 - `manifest.yaml`;
 - `train_log.jsonl`;
-- checkpoint + tokenizer/config;
+- final HF-loadable checkpoint + tokenizer/config in one folder;
 - inference script;
 - exact dependency versions;
 - corpus/hash list;
 - model weights access link;
 - README/model card/final report/demo/results.
 
-Historical fields that do not exist (especially base-training `grad_norm`) must be marked unavailable rather than invented. New SFT logs should include them correctly.
+Historical fields that do not exist (especially base-training `grad_norm`) must be marked unavailable rather than invented. New SFT logs should include the requested fields wherever the trainer makes them available.
 
 ---
 
-## 14. Critical path to deadline
+## 16. Critical path to deadline
 
 Current order of operations:
 
-1. **Secure valid BF16-capable remote GPU.**
-2. **Stable-33750 DEV baseline.**
-3. **Create leakage-safe Hindi history/instruction/safety SFT dataset.**
-4. **Contamination check.**
-5. **SFT on persistent GPU.**
-6. **Base vs Instruct DEV + safety/general evaluation.**
-7. **Lock final model and run Hidden-25 once.**
-8. **Compact KG demo if time remains.**
-9. **Finalize model card, README, report, intake, manifest, logs, inference/demo and submission package.**
+1. **Install `wandb` in Lightning.**
+2. **Rerun the 1-step T4/FP16 native SFT memory smoke** at seq len 256, batch 1.
+3. **Choose fine-tuning strategy from measured memory result:** native full SFT if it fits; otherwise memory-efficient tuning immediately.
+4. **Run SFT** on the 275-row leakage-controlled Hindi history/instruction/safety dataset.
+5. **Evaluate Instruct on DEV + safety/general checks** and compare with saved Base baseline.
+6. **Prototype/finalize faithful HF `PreTrainedModel` + tokenizer export** and verify AutoModel/AutoTokenizer clean reload and parity.
+7. **Lock the final model.**
+8. **Run Hidden-25 once** on the final locked model.
+9. **Run final all-100 contamination audit for reporting.**
+10. **Compact KG guardrail/demo only if time remains.**
+11. **Finalize model card, README, report, intake, manifest, logs, inference/demo, HF weights link and submission package.**
 
-No rubric-critical requirement should be silently dropped. Moving fast means parallelizing and simplifying implementation, not fabricating evidence or weakening the evaluation protocol.
+No rubric-critical requirement should be silently dropped. Moving fast means simplifying implementation and parallelizing CPU/documentation work, not fabricating evidence or weakening the evaluation protocol.
 
 ---
 
-## 15. Repository / checkpoint hygiene
+## 17. Optional differentiator: Knowledge-Graph guardrail
+
+After SFT/evaluation/HF-export critical path is secure, a compact Indian History/Cultural Heritage KG can be used as a differentiator:
+
+- neural model handles language;
+- graph supplies explicit factual triples;
+- graph can ground prompts before generation;
+- generated claims can be marked supported / contradicted / unverifiable afterward.
+
+This is a differentiator, **not a blocker**.
+
+---
+
+## 18. Repository / checkpoint hygiene
 
 Checkpoint files should not be committed to Git. Recommended `.gitignore` entries:
 
@@ -352,19 +577,23 @@ optim_*_rank*.pt
 
 Do not blanket-ignore every `.pt` file because the tokenizer uses `token_bytes.pt`.
 
----
-
-## 16. Recovery protocol for a new ChatGPT thread
-
-If the current conversation becomes too long or a fresh thread is started, begin with:
-
-> Read `CAPSTONE_STATE.md` in `aayush-0131/Hindi_SLM` first. Treat it as the canonical project state. Do not change the frozen benchmark, domain, base checkpoint, hidden-set policy, or paid-compute policy without explicit approval. Then continue from the `Current blocker` and `Critical path` sections.
-
-Then verify the newest repo commit and update this file when a material project decision changes.
+Do not commit the Hidden-25 benchmark file.
 
 ---
 
-## 17. Update policy for this file
+## 19. Recovery protocol for a new ChatGPT thread
+
+The current long chat became UI-heavy/laggy and should be replaced with a fresh chat inside the **SLM++ Bootcamp Capstone Project**.
+
+Start the new chat with:
+
+> Read `CAPSTONE_STATE.md` in `aayush-0131/Hindi_SLM` first and treat it as the canonical state of my IAIRO SLM++ capstone. Also use the relevant context from this project. Continue exactly from the current blocker without redoing completed work. Do not change the frozen benchmark, use the hidden set for model selection, purchase compute, publish weights, or change the model/domain strategy without my approval.
+
+Then continue from **Section 11 — CURRENT BLOCKER**. The immediate next action is installing `wandb`, then rerunning the 1-step SFT memory smoke.
+
+---
+
+## 20. Update policy for this file
 
 Update `CAPSTONE_STATE.md` whenever any of these changes:
 
@@ -375,6 +604,7 @@ Update `CAPSTONE_STATE.md` whenever any of these changes:
 - SFT dataset/version/hash;
 - chosen fine-tuning method;
 - baseline/final scores;
+- HF export/load status;
 - locked final checkpoint;
 - current blocker;
 - critical path;
