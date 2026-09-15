@@ -1,0 +1,87 @@
+schema_version: "1.0"
+project: "Hindi SLM Capstone"
+protocol_status: "FROZEN_BEFORE_FINAL_INSTRUCT_EVALUATION"
+
+principles:
+  - "Keep Base and Instruct results separate."
+  - "Use HistoryBench DEV-75 for iterative model selection only."
+  - "Use HistoryBench Hidden-25 exactly once, only after the final instruct checkpoint and config are locked and hashed."
+  - "Do not alter HistoryBench-HI v1 wording, answers, labels, split, reference answers, or rubrics."
+  - "Do not describe raw v1 MCQ accuracy as balanced four-way chance performance because DEV answer positions are strongly imbalanced."
+  - "Preserve raw generations verbatim before manual judging."
+
+benchmark:
+  name: "HistoryBench-HI v1"
+  frozen_csv_sha256: "21dc840c8d4fc07288ddbeaf61c4b8cf41e930b0504131e3252ab45d4e224fbe"
+  dev_csv_sha256: "ac69ea72ba0721e9a934825e93070e4117f3554d66acb693aa4e4033ef5d78e5"
+  hidden_csv_sha256: "9c8b56d2f528fdcede9a1a835a31a6479a791a0b786408745a614c167dfc90b2"
+  dev_items: 75
+  hidden_items: 25
+  dev_mcq_items: 55
+  dev_open_ended_items: 20
+
+base_reference:
+  checkpoint_label: "Stable-33750"
+  checkpoint_sha256: "1ad56ea60a5e28d6899146a56f63b1833837dbe6f6cef9128bb2bf4a51faa00d"
+  runtime: "Tesla T4 / FP16 / PyTorch 2.8.0+cu128"
+  dev_mcq_correct: 15
+  dev_mcq_total: 55
+  dev_mcq_accuracy: 0.2727272727272727
+  dev_open_ended_generated: 20
+  dev_open_ended_total: 20
+  precision_caveat: "Pretraining used H200/BF16; saved DEV engineering baseline used T4/FP16."
+
+mcq:
+  scoring: "conditional-loss scoring over the frozen answer choices"
+  deterministic: true
+  report:
+    - "overall correct/total and accuracy"
+    - "difficulty breakdown"
+    - "subdomain breakdown"
+    - "prediction-position counts"
+    - "gold-position counts"
+  v1_limitation:
+    dev_gold_positions: {A: 7, B: 41, C: 7, D: 0}
+    required_note: "Answer-position imbalance limits interpretation of absolute MCQ accuracy; emphasize paired Base-vs-Instruct deltas."
+
+open_ended:
+  generation_config: "LOCK_WITH_FINAL_CHECKPOINT"
+  preserve_raw_outputs: true
+  judging: "Use the frozen HistoryBench rubric; judge correctness and reasoning without changing reference answers after seeing model outputs."
+  report:
+    - "aggregate rubric result"
+    - "subdomain breakdown"
+    - "representative failure modes"
+  base_known_failure: "Prompt copying/rephrasing and repetition loops were observed in inspected hard DEV examples."
+
+safety:
+  suite: "eval/safety_hi_v1.jsonl"
+  rubric: "eval/safety_hi_v1_rubric.md"
+  paired_base_vs_instruct: true
+  deterministic_decoding_preferred: true
+  preserve_raw_outputs: true
+  required_regression: "SAFE-001 / benign Hindi prefix 'मेरा नाम'"
+  deployment_claim_rule: "Passing this compact diagnostic is not proof of deployment safety."
+
+final_lock:
+  before_hidden_25:
+    - "record final instruct checkpoint SHA-256"
+    - "record tokenizer SHA-256"
+    - "record inference/generation config SHA-256"
+    - "record evaluation config SHA-256"
+    - "record source Git commit"
+    - "record random seed(s) where applicable"
+    - "run and save all-100 contamination audit against the frozen SFT package"
+  hidden_policy: "No tuning, prompt editing, checkpoint selection, or retry based on Hidden-25 results."
+  after_hidden_25:
+    - "save raw predictions/generations"
+    - "save summary and judging artifacts"
+    - "hash result artifacts"
+    - "report Hidden-25 separately from DEV-75"
+
+pending_runtime_fields:
+  final_instruct_checkpoint_sha256: null
+  final_tokenizer_sha256: null
+  final_generation_config_sha256: null
+  final_source_commit: null
+  final_seed: null
