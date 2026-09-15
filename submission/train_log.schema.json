@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/aayush-0131/Hindi_SLM/submission/train_log.schema.json",
+  "title": "Hindi SLM Capstone Training Log Record",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["schema_version", "phase", "event", "timestamp_utc"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "phase": {"enum": ["pretraining_reconstructed", "sft", "lora", "evaluation", "artifact"]},
+    "event": {"type": "string", "minLength": 1},
+    "timestamp_utc": {"type": "string", "format": "date-time"},
+    "step": {"type": ["integer", "null"], "minimum": 0},
+    "split": {"type": ["string", "null"]},
+    "loss": {"type": ["number", "null"]},
+    "val_loss": {"type": ["number", "null"]},
+    "val_bpb": {"type": ["number", "null"]},
+    "learning_rate": {"type": ["number", "null"]},
+    "grad_norm": {"type": ["number", "null"]},
+    "grad_norm_status": {"enum": ["observed", "unavailable", "not_applicable", null]},
+    "tokens_per_second": {"type": ["number", "null"]},
+    "mfu": {"type": ["number", "null"]},
+    "elapsed_seconds": {"type": ["number", "null"], "minimum": 0},
+    "precision": {"type": ["string", "null"]},
+    "device": {"type": ["string", "null"]},
+    "world_size": {"type": ["integer", "null"], "minimum": 1},
+    "seed": {"type": ["integer", "null"]},
+    "checkpoint_sha256": {"type": ["string", "null"], "pattern": "^[0-9a-f]{64}$"},
+    "source": {"type": ["string", "null"]},
+    "notes": {"type": ["string", "null"]}
+  }
+}
