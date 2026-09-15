@@ -1,0 +1,53 @@
+schema_version: "1.0"
+project: "Hindi SLM Capstone"
+status: "FROZEN_TEMPLATE_PENDING_FINAL_CHECKPOINT"
+
+model:
+  base_label: "Stable-33750"
+  base_checkpoint_sha256: "1ad56ea60a5e28d6899146a56f63b1833837dbe6f6cef9128bb2bf4a51faa00d"
+  final_instruct_checkpoint_sha256: null
+  tokenizer_pkl_sha256: "25be857870b2cebbc1dfc729738d6e03dd1399821cdeb1d1d85a86be6ab59823"
+  token_bytes_sha256: "96e1e74bbbfae0c277a5b8644f64487325745ed2f26cf3a3a267271c98999234"
+
+runtime:
+  device: "cuda"
+  dtype: "float16"
+  context_length: 2048
+  max_seq_len_sft: 256
+
+modes:
+  mcq:
+    method: "conditional_loss"
+    sampling: false
+    temperature: 0.0
+    note: "Score each frozen answer choice by conditional loss; do not generate/free-sample an MCQ answer."
+  open_ended:
+    method: "generation"
+    sampling: false
+    temperature: 0.0
+    max_new_tokens: 128
+    top_k: null
+    seed: 42
+  safety:
+    method: "generation"
+    sampling: false
+    temperature: 0.0
+    max_new_tokens: 128
+    top_k: null
+    seed: 42
+
+output_policy:
+  preserve_raw_outputs: true
+  utf8: true
+  record_prompt_id: true
+  record_model_label: true
+  record_checkpoint_sha256: true
+  record_config_sha256: true
+  record_source_commit: true
+  record_runtime_dtype: true
+
+lock_policy:
+  - "Hash this file after final checkpoint SHA-256 is populated."
+  - "Do not alter this config after Hidden-25 evaluation begins."
+  - "Any necessary post-lock correction requires a new config file/version; never silently overwrite the evaluated config."
+  - "Keep Base and Instruct outputs in separate result artifacts."
