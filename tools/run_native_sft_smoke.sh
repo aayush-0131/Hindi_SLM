@@ -17,7 +17,7 @@ python tools/capstone_preflight.py \
   --json-out "$OUT/preflight.json"
 
 python - <<'PY' > "$OUT/runtime.json"
-import json, os, platform, subprocess, sys
+import json, os, platform, sys
 mods={}
 for name in ("torch","wandb"):
     try:
@@ -40,12 +40,29 @@ git status --porcelain > "$OUT/git_status.txt"
 export NANOCHAT_DTYPE="${NANOCHAT_DTYPE:-float16}"
 export PYTORCH_CUDA_ALLOC_CONF="${PYTORCH_CUDA_ALLOC_CONF:-expandable_segments:True}"
 
-# The custom history task/trainer are expected to be present from the canonical project state.
-# Keep this invocation deliberately tiny: one optimization step, batch size 1, no W&B run.
-# tee preserves stdout for train_log reconstruction even if the process OOMs.
+# Canonical capstone state specifies nanochat/scripts/chat_sft_history.py as the
+# custom trainer wired directly to HistoryHiSFT(train/val). Refuse to fall back
+# to the upstream SmolTalk/MMLU/GSM8K trainer: doing so would test the wrong task.
+TRAINER="$REPO/nanochat/scripts/chat_sft_history.py"
+if [[ ! -f "$TRAINER" ]]; then
+  echo "BLOCKER: canonical History SFT trainer missing: $TRAINER" | tee "$OUT/run.log"
+  python - <<PY > "$OUT/result.json"
+import json
+print(json.dumps({"exit_code":4,"result_dir":"$OUT",
+ "interpretation":"INTEGRATION_BLOCKER: chat_sft_history.py is missing. Do not infer native-SFT OOM/fit from this run."},indent=2))
+PY
+  sha256sum "$OUT"/* > "$OUT/SHA256SUMS" 2>/dev/null || true
+  cat "$OUT/result.json"
+  exit 4
+fi
+
+python -m py_compile "$TRAINER"
+
+# Deliberately tiny: one optimization step, batch size 1, sequence length 256.
+# The history-specific trainer owns the HistoryHiSFT wiring; no generic --task
+# override is supplied here. tee preserves stdout even on OOM.
 set +e
-python -m nanochat.scripts.chat_sft \
-  --task=HistorySFT \
+python "$TRAINER" \
   --run=dummy \
   --num_iterations=1 \
   --device_batch_size=1 \
@@ -57,6 +74,7 @@ set -e
 python - <<PY > "$OUT/result.json"
 import json
 print(json.dumps({"exit_code":$RC,"result_dir":"$OUT",
+ "trainer":"nanochat/scripts/chat_sft_history.py",
  "interpretation":"PASS if exit_code=0; CUDA OOM means use prepared memory-efficient fallback. Other errors are environment/integration blockers, not evidence that full SFT does not fit."},indent=2))
 PY
 
