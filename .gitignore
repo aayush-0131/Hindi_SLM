@@ -30,3 +30,34 @@ dist/
 
 # Logs
 *.log
+
+# ------------------------------------------------------------
+# SLM++ capstone: large/private/generated artifacts
+# ------------------------------------------------------------
+
+# Model / optimizer checkpoints
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+
+# Archives / local bundles
+*.zip
+
+# Temporary trainer backups
+*.pre_fp16_master_fix
+
+# Hidden benchmark material must never be committed
+**/hidden25*
+**/Hidden25*
+**/hidden_25*
+**/Hidden_25*
+
+# Smoke-test outputs are disposable
+results/**/*_smoke/
+results/**/*smoke*/
+
+# Runtime/model-storage directories if ever copied into repo
+hindi_slm_runtime/
+chatsft_checkpoints/
+base_checkpoints/
