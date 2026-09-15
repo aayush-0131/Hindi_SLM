@@ -1,0 +1,102 @@
+schema_version: "1.0"
+project:
+  name: "Hindi SLM Capstone"
+  program: "IAIRO PRAMANA SLM++ Bootcamp"
+  domain: "Indian History & Cultural Heritage"
+  primary_tasks: ["question answering", "explanation", "summarization"]
+  target_user: "Hindi-medium students and learners"
+
+base_model:
+  label: "Stable-33750"
+  training_step: 33750
+  parameters: 910690922
+  layers: 24
+  d_model: 1152
+  attention_heads: 18
+  kv_heads: 18
+  vocab_size: 32768
+  context_length: 2048
+  activation: "ReLU^2"
+  normalization: "RMSNorm with QK norm"
+  positional_encoding: "RoPE"
+  embeddings_lm_head: "untied"
+  pretraining_precision: "BF16"
+  optimizer_family: "Muon / MuonAdamW"
+  total_batch_tokens_per_step: 524288
+  pretraining_hardware: "NVIDIA H200, world size 1"
+  checkpoint:
+    path_runtime: "~/hindi_slm_runtime/ckpt_stable_final/model_033750.pt"
+    sha256: "1ad56ea60a5e28d6899146a56f63b1833837dbe6f6cef9128bb2bf4a51faa00d"
+  metadata:
+    path_runtime: "~/hindi_slm_runtime/ckpt_stable_final/meta_033750.json"
+    sha256: "8f2d7c586d0c9ddc30633dee4310c4759ca9068b5c256595f124f57a43563013"
+
+tokenizer:
+  type: "byte-level BPE, Devanagari-aware"
+  vocab_size: 32768
+  tokenizer_pkl_sha256: "25be857870b2cebbc1dfc729738d6e03dd1399821cdeb1d1d85a86be6ab59823"
+  token_bytes_sha256: "96e1e74bbbfae0c277a5b8644f64487325745ed2f26cf3a3a267271c98999234"
+
+sft_dataset:
+  name: "History-HI-SFT-v1"
+  train_conversations: 275
+  validation_conversations: 36
+  total_conversations: 311
+  package_sha256: "9d78b9a9fce9c3a8d7343195ea1c49a848b1c63214c445fb8cfdadef09587f0f"
+  max_seq_len: 256
+  leakage_gate:
+    dev_75_exact_ngram_n: 8
+    dev_75_rows_with_overlap: 0
+    dev_75_status: "PASS_NO_EXACT_NGRAM_OVERLAP"
+    all_100_final_audit: "PENDING"
+
+benchmark:
+  name: "HistoryBench-HI v1"
+  status: "FROZEN_BEFORE_SFT"
+  total_items: 100
+  dev_items: 75
+  hidden_items: 25
+  frozen_csv_sha256: "21dc840c8d4fc07288ddbeaf61c4b8cf41e930b0504131e3252ab45d4e224fbe"
+  dev_csv_sha256: "ac69ea72ba0721e9a934825e93070e4117f3554d66acb693aa4e4033ef5d78e5"
+  hidden_csv_sha256: "9c8b56d2f528fdcede9a1a835a31a6479a791a0b786408745a614c167dfc90b2"
+  hidden_policy: "Never use for training or iterative model selection; evaluate once only after final instruct checkpoint is locked and hashed."
+
+base_evaluation:
+  historybench_dev:
+    runtime: "Tesla T4 / FP16 / PyTorch 2.8.0+cu128"
+    mcq_correct: 15
+    mcq_total: 55
+    mcq_accuracy: 0.2727272727272727
+    open_ended_generated: 20
+    open_ended_total: 20
+    caveat: "DEV answer positions are strongly imbalanced; do not characterize raw MCQ accuracy as a balanced four-way chance comparison."
+  safety:
+    known_failure: "Explicit sexual/adult continuation observed from benign Hindi prefix 'मेरा नाम'."
+    deployment_claim: "Raw base model is not deployment-safe."
+
+post_training:
+  method: "PENDING_MEASURED_T4_DECISION"
+  rule: "Attempt native full SFT first; use prepared memory-efficient fallback only if measured T4 memory evidence requires it."
+  trainer: "nanochat/scripts/chat_sft_history.py"
+  task: "nanochat/tasks/history_hi_sft.py"
+  max_seq_len: 256
+  final_checkpoint_sha256: null
+  final_config_sha256: null
+  final_tokenizer_sha256: null
+
+reproducibility:
+  canonical_state: "CAPSTONE_STATE.md"
+  train_log: "submission/train_log.jsonl"
+  train_log_schema: "submission/train_log.schema.json"
+  dependency_capture: "PENDING_RUNTIME_CAPTURE"
+  source_commit: "PENDING_FINAL_LOCK"
+  random_seed: "PENDING_FINAL_RUN_CONFIG"
+  inference_config: "PENDING_FINAL_CHECKPOINT"
+  evaluation_config: "PENDING_FINAL_CHECKPOINT"
+
+claim_boundaries:
+  - "Do not claim grad_norm for historical pretraining; it is unavailable."
+  - "Do not claim the raw base model is safe for unrestricted deployment."
+  - "Do not claim absence of semantic contamination from an exact n-gram audit."
+  - "Report the H200/BF16 pretraining versus T4/FP16 engineering-baseline precision mismatch."
+  - "Keep Base and Instruct results separate."
