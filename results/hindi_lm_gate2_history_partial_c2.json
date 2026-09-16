@@ -1,0 +1,45 @@
+{
+  "model_tag": "history_partial_c2",
+  "step": 120,
+  "base_checkpoint": "stable@33750",
+  "smoke_test": false,
+  "eval_path": "lighteval accelerate against sft/hf_export_final (HF wrapper), same path used for Goldfish-Hindi",
+  "results": {
+    "community_arc_hin_mcf:easy|0": {
+      "acc": 0.24705387205387205,
+      "acc_stderr": 0.008850055161459237,
+      "chance": 0.25,
+      "bar": 0.2875,
+      "verdict": "DEGENERATE"
+    },
+    "community_arc_hin_mcf:challenge|0": {
+      "acc": 0.24146757679180889,
+      "acc_stderr": 0.012506564839739432,
+      "chance": 0.25,
+      "bar": 0.2875,
+      "verdict": "DEGENERATE"
+    },
+    "community_boolq_hin|0": {
+      "acc": 0.3804281345565749,
+      "acc_stderr": 0.008491310027059603,
+      "chance": 0.5,
+      "bar": 0.575,
+      "verdict": "DEGENERATE"
+    },
+    "community_hellaswag_hin_mcf|0": {
+      "acc": 0.25363473411670984,
+      "acc_stderr": 0.004342017709967976,
+      "chance": 0.25,
+      "bar": 0.2875,
+      "verdict": "DEGENERATE"
+    },
+    "belebele_hin_Deva_mcf|0": {
+      "acc": 0.2644444444444444,
+      "acc_stderr": 0.014709405413413137,
+      "chance": 0.25,
+      "bar": 0.2875,
+      "verdict": "DEGENERATE"
+    }
+  },
+  "aggregate_acc": 0.277405752392682
+}
