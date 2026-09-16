@@ -1,0 +1,28 @@
+FINAL MODEL LOCK
+
+Checkpoint:
+history_partial_c2 / step 120
+
+Selection rationale:
+- Base HistoryBench-HI DEV MCQ: 15/55 = 27.27%
+- Candidate 1 DEV MCQ: 16/55 = 29.09%
+- Candidate 2 DEV MCQ: 23/55 = 41.82%
+- Candidate 3 was rejected before canonical DEV evaluation because it failed
+  held-out behavioral sanity checks with severe single-letter collapse,
+  repetition, and off-topic generation.
+
+Known limitation:
+Candidate 2 still exhibits repetitive/degenerate open-ended generation.
+Its strongest demonstrated improvement is domain multiple-choice performance.
+
+Hidden-25 status:
+UNTOUCHED at time of final model lock.
+
+No further model training or model-selection changes are permitted after this lock.
+
+SHA256:
+model_000120.pt:
+c744a163be8b70ac2f2e840e3d0659ac33569816bf9a4ff4eb4b32918e7250a7
+
+meta_000120.json:
+36beab06660d0b5815808f5e2715211686011c01da4114fd647fa7f4e31835ef

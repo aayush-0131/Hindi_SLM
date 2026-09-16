@@ -1,0 +1,22 @@
+{
+  "tokenizer_class": "HindiSLMTokenizer",
+  "bos_token": "<|bos|>",
+  "eos_token": "<|assistant_end|>",
+  "model_max_length": 256,
+  "auto_map": {
+    "AutoTokenizer": [
+      "tokenization_hindi_slm.HindiSLMTokenizer",
+      null
+    ]
+  },
+  "additional_special_tokens": [
+    "<|user_start|>",
+    "<|user_end|>",
+    "<|assistant_start|>",
+    "<|python_start|>",
+    "<|python_end|>",
+    "<|output_start|>",
+    "<|output_end|>"
+  ],
+  "chat_template": "{{ bos_token }}{% for message in messages %}{% if message['role'] == 'user' %}<|user_start|>{{ message['content'] }}<|user_end|>{% elif message['role'] == 'assistant' %}<|assistant_start|>{{ message['content'] }}<|assistant_end|>{% endif %}{% endfor %}{% if add_generation_prompt %}<|assistant_start|>{% endif %}"
+}
