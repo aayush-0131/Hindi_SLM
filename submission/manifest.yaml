@@ -1,102 +1,184 @@
-schema_version: "1.0"
+schema_version: '2.0'
+updated: '2026-09-17'
+delivery_status: DOCUMENTATION_PREPARED_NOT_SUBMITTED
 project:
-  name: "Hindi SLM Capstone"
-  program: "IAIRO PRAMANA SLM++ Bootcamp"
-  domain: "Indian History & Cultural Heritage"
-  primary_tasks: ["question answering", "explanation", "summarization"]
-  target_user: "Hindi-medium students and learners"
-
-base_model:
-  label: "Stable-33750"
-  training_step: 33750
+  name: Hindi SLM Capstone
+  program: IAIRO PRAMANA SLM++ Bootcamp
+  domain: Indian History & Cultural Heritage
+  tasks:
+  - question answering
+  - explanation
+  - summarization
+  target_user: Hindi-medium learners; research only, not validated for deployment
+final_model:
+  label: C2_step120
+  locked: true
+  retrain_allowed: false
+  retune_allowed: false
+  checkpoint_reselection_allowed: false
+  native_sha256: c744a163be8b70ac2f2e840e3d0659ac33569816bf9a4ff4eb4b32918e7250a7
+  metadata_sha256: 36beab06660d0b5815808f5e2715211686011c01da4114fd647fa7f4e31835ef
   parameters: 910690922
   layers: 24
   d_model: 1152
   attention_heads: 18
   kv_heads: 18
   vocab_size: 32768
-  context_length: 2048
-  activation: "ReLU^2"
-  normalization: "RMSNorm with QK norm"
-  positional_encoding: "RoPE"
-  embeddings_lm_head: "untied"
-  pretraining_precision: "BF16"
-  optimizer_family: "Muon / MuonAdamW"
-  total_batch_tokens_per_step: 524288
-  pretraining_hardware: "NVIDIA H200, world size 1"
-  checkpoint:
-    path_runtime: "~/hindi_slm_runtime/ckpt_stable_final/model_033750.pt"
-    sha256: "1ad56ea60a5e28d6899146a56f63b1833837dbe6f6cef9128bb2bf4a51faa00d"
-  metadata:
-    path_runtime: "~/hindi_slm_runtime/ckpt_stable_final/meta_033750.json"
-    sha256: "8f2d7c586d0c9ddc30633dee4310c4759ca9068b5c256595f124f57a43563013"
-
-tokenizer:
-  type: "byte-level BPE, Devanagari-aware"
-  vocab_size: 32768
-  tokenizer_pkl_sha256: "25be857870b2cebbc1dfc729738d6e03dd1399821cdeb1d1d85a86be6ab59823"
-  token_bytes_sha256: "96e1e74bbbfae0c277a5b8644f64487325745ed2f26cf3a3a267271c98999234"
-
+  export_context_length: 256
+  base_context_length: 2048
+  native_drive_path: Hindi_SLM_Capstone_Submission/model_000120.pt
+base_model:
+  label: Stable-33750
+  step: 33750
+  checkpoint_sha256: 1ad56ea60a5e28d6899146a56f63b1833837dbe6f6cef9128bb2bf4a51faa00d
+  precision: BF16
+  hardware: NVIDIA H200
+  provenance: historical project state
+post_training:
+  method: 'partial SFT: final 4 transformer blocks + lm_head'
+  trainable_parameters: 101450160
+  trainable_tensors: 27
+  optimizer: AdamW
+  learning_rate: 5.0e-06
+  checkpoint_step: 120
+  configured_iterations: 120
+  max_seq_len: 256
+  device_batch_size: 1
+  configured_total_batch_tokens: 256
+  data_seed: 42
+  warmup_ratio: 0.1
+  warmdown_ratio: 0.3
+  init_lr_frac: 1.0
+  final_lr_frac: 0.1
+  load_optimizer: false
+  chatcore_every: -1
+  eval_tokens: 2048
+  precision: FP16
+  hardware: Tesla T4
+  final_val_bpb: 0.3812000506303815
+  peak_memory_mib_logged: 6026.61
+  gpu_hours: null
+  exact_supervised_tokens: null
+  exact_trainer_path: nanochat/scripts/chat_sft_history_partial_c2.py
+  trainer_gap: Recovered working/local/upstream bytes agree; no contemporaneous training-time
+    source hash.
+  recovered_trainer_sha256: 1ddd87c92ea982aaadbb04d0510f5836e2a8f085c007db623357b641c435144f
+  adamw_betas:
+  - 0.9
+  - 0.95
+  adamw_eps: 1.0e-08
+  adamw_weight_decay: 0.01
+  adamw_foreach: false
 sft_dataset:
-  name: "History-HI-SFT-v1"
+  name: History-HI-SFT-v1
   train_conversations: 275
   validation_conversations: 36
-  total_conversations: 311
-  package_sha256: "9d78b9a9fce9c3a8d7343195ea1c49a848b1c63214c445fb8cfdadef09587f0f"
-  max_seq_len: 256
-  leakage_gate:
-    dev_75_exact_ngram_n: 8
-    dev_75_rows_with_overlap: 0
-    dev_75_status: "PASS_NO_EXACT_NGRAM_OVERLAP"
-    all_100_final_audit: "PENDING"
-
+  seed_zip_sha256: 9d78b9a9fce9c3a8d7343195ea1c49a848b1c63214c445fb8cfdadef09587f0f
+  hash_note: Seed ZIP provenance, not the history_hi_sft_v1.tar.gz hash.
+hf_export:
+  path_lightning: /teamspace/studios/this_studio/Hindi_SLM/hf_export
+  file_sha256:
+    config.json: e85ab0897b83e00cbfe8e6fcab778aead47ec98f055f0cb237265c6601a40036
+    configuration_hindi_slm.py: 7164d555d2ee0f490a6a226adc4103bfd7ab5603fdbbfbf0abc82c1220f18e35
+    modeling_hindi_slm.py: 607b447d9fae765abdd4f4c966e9657bcf2fc5d33072e3481894ce5f41274f88
+    tokenization_hindi_slm.py: eeaa2f1b1a1f5a93576c73b4f2d9b7cd5246ab9f109fe35435e7983b3e99a7a3
+    tokenizer.pkl: 25be857870b2cebbc1dfc729738d6e03dd1399821cdeb1d1d85a86be6ab59823
+    tokenizer_config.json: 0e8044e20af7e75bcd9d1471202ee9e6ed32c70af8b08053a20393f584fca29b
+    special_tokens_map.json: b6486782b2ccfe169179fa533e9022621952fbe4b6f190581648d5278ffecb8b
+    model.safetensors: b69f0e01088cca8f39659dcf67125003640788546021598577551e48420977a0
+  hash_verification: all eight checked in user-run Lightning batch
+  parity_report: submission/evidence/HF_PARITY_REPORT.md
+  tensor_identity: 175/175 exact
+  forward_parity_scope: one diagnostic prompt, CPU FP32, zero max/mean logit difference
+  trust_remote_code_required: true
+  saved_pad_token_explicit: false
+  padding_policy: runtime EOS fallback; frozen bytes unchanged
+  organizer_contract_confirmed: false
+  weights_access_url: null
 benchmark:
-  name: "HistoryBench-HI v1"
-  status: "FROZEN_BEFORE_SFT"
-  total_items: 100
-  dev_items: 75
-  hidden_items: 25
-  frozen_csv_sha256: "21dc840c8d4fc07288ddbeaf61c4b8cf41e930b0504131e3252ab45d4e224fbe"
-  dev_csv_sha256: "ac69ea72ba0721e9a934825e93070e4117f3554d66acb693aa4e4033ef5d78e5"
-  hidden_csv_sha256: "9c8b56d2f528fdcede9a1a835a31a6479a791a0b786408745a614c167dfc90b2"
-  hidden_policy: "Never use for training or iterative model selection; evaluate once only after final instruct checkpoint is locked and hashed."
-
-base_evaluation:
-  historybench_dev:
-    runtime: "Tesla T4 / FP16 / PyTorch 2.8.0+cu128"
-    mcq_correct: 15
-    mcq_total: 55
-    mcq_accuracy: 0.2727272727272727
-    open_ended_generated: 20
-    open_ended_total: 20
-    caveat: "DEV answer positions are strongly imbalanced; do not characterize raw MCQ accuracy as a balanced four-way chance comparison."
-  safety:
-    known_failure: "Explicit sexual/adult continuation observed from benign Hindi prefix 'मेरा नाम'."
-    deployment_claim: "Raw base model is not deployment-safe."
-
-post_training:
-  method: "PENDING_MEASURED_T4_DECISION"
-  rule: "Attempt native full SFT first; use prepared memory-efficient fallback only if measured T4 memory evidence requires it."
-  trainer: "nanochat/scripts/chat_sft_history.py"
-  task: "nanochat/tasks/history_hi_sft.py"
-  max_seq_len: 256
-  final_checkpoint_sha256: null
-  final_config_sha256: null
-  final_tokenizer_sha256: null
-
+  name: HistoryBench-HI v1
+  frozen: true
+  rows: 100
+  dev_rows: 75
+  hidden_rows: 25
+  frozen_csv_sha256: 21dc840c8d4fc07288ddbeaf61c4b8cf41e930b0504131e3252ab45d4e224fbe
+  hidden_sha256: 9c8b56d2f528fdcede9a1a835a31a6479a791a0b786408745a614c167dfc90b2
+  hidden_consumed_once: true
+  hidden_rerun_allowed: false
+  completed_utc: '2026-09-17T08:35:21Z'
+  dev_gold_counts:
+    A: 7
+    B: 41
+    C: 7
+    D: 0
+  hidden_gold_counts: null
+evaluation:
+  runtime:
+    gpu: Tesla T4
+    precision: FP16
+    pytorch: 2.8.0+cu128
+    cuda: '12.8'
+    cudnn: 91002
+  dev_mcq:
+    correct: 23
+    total: 55
+    accuracy: 0.41818181818181815
+  hidden_mcq:
+    correct: 8
+    total: 15
+    accuracy: 0.5333333333333333
+  dev_open_ended_generated: 20
+  hidden_open_ended_generated: 10
+  saved_generation_judge_status: NOT_YET_JUDGED
+  hidden_rubric_reported:
+    score: 14
+    maximum: 80
+    fraction: 0.175
+    status: PROVISIONAL_HANDOFF_REPORT_LEDGER_NOT_RECOVERED
+    judge: null
+    blind_judging_verified: false
+  generation:
+    max_new_tokens: 256
+    temperature: 0.3
+    top_k: 50
+    seed: 42
+  safety: Saved C2 benign-prefix explicit sexual continuation; not safe for unrestricted
+    deployment
+contamination_audit:
+  status: PASS_NO_EXACT_NGRAM_OVERLAP
+  method: exact_token_ngram_overlap
+  ngram_n: 8
+  benchmark_rows: 100
+  train_rows: 275
+  val_rows: 36
+  train_rows_with_overlap: 0
+  val_rows_with_overlap: 0
+  report_sha256: 52696d5b8af0f1a968ff1370fb5c2e5f4ead63ad4e043e0aad93375302ff3ddc
+  drive_relative_path: contamination_audit/20260917T120424_031844Z/all100_contamination_report.json
+  claim_boundary: Does not establish absence of semantic contamination or pretraining
+    overlap.
 reproducibility:
-  canonical_state: "CAPSTONE_STATE.md"
-  train_log: "submission/train_log.jsonl"
-  train_log_schema: "submission/train_log.schema.json"
-  dependency_capture: "PENDING_RUNTIME_CAPTURE"
-  source_commit: "PENDING_FINAL_LOCK"
-  random_seed: "PENDING_FINAL_RUN_CONFIG"
-  inference_config: "PENDING_FINAL_CHECKPOINT"
-  evaluation_config: "PENDING_FINAL_CHECKPOINT"
-
+  state: CAPSTONE_STATE.md
+  lightning_evidence_commit: 44cd791203be73d576471e9ffffc4a43380d64c3
+  colab_clone_commit: 05d66d66bbe622a149429518ed7a5299e51d0edb
+  final_delivery_commit: null
+  train_log: submission/train_log.jsonl
+  train_log_type: Unchanged upstream reconstructed pretraining observations
+  historical_dependency_lock: null
+  repository_torch_pin_conflict: Bundled pyproject.toml pins 2.9.1, canonical evaluation
+    used 2.8.0+cu128
+  evidence_index: submission/evidence/LIGHTNING_EVIDENCE_INDEX.json
+  input_zip_sha256: dbceb3699b2331cd43ea6470c2e371ec705b1ac7bae01e150ed9a46d08850456
+  sft_derived_train_log: submission/c2_train_log_derived.jsonl
+  sft_derived_train_log_schema: submission/c2_train_log_derived.schema.json
+  current_environment_capture: submission/evidence/CURRENT_LIGHTNING_ENVIRONMENT.json
+  integration_base_commit: 05d66d66bbe622a149429518ed7a5299e51d0edb
+  git_tree_comparison: Upstream contains C2 source; only state differs plus upstream-added
+    paths.
 claim_boundaries:
-  - "Do not claim grad_norm for historical pretraining; it is unavailable."
-  - "Do not claim the raw base model is safe for unrestricted deployment."
-  - "Do not claim absence of semantic contamination from an exact n-gram audit."
-  - "Report the H200/BF16 pretraining versus T4/FP16 engineering-baseline precision mismatch."
-  - "Keep Base and Instruct results separate."
+- MCQ answer-position imbalance prevents strong reasoning claims.
+- Exact overlap screening is not semantic decontamination.
+- Reported Hidden rubric score is provisional until ledger recovery.
+- Historical gradient norms unavailable; never fabricate.
+- No deployment-safety claim.
+- No public weights access or external submission is established.

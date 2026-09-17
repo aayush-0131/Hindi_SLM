@@ -1,0 +1,9 @@
+{
+  "path": "nanochat/scripts/chat_sft_history_partial_c2.py",
+  "sha256": "1ddd87c92ea982aaadbb04d0510f5836e2a8f085c007db623357b641c435144f",
+  "working_equals_local_equals_upstream": true,
+  "local_commit": "44cd791203be73d576471e9ffffc4a43380d64c3",
+  "upstream_commit": "05d66d66bbe622a149429518ed7a5299e51d0edb",
+  "basis": "Recovered source consistent with C2 log/metadata; no recorded training-time source hash.",
+  "git_comparison_input_sha256": "90e9788390d790adce605b761ee6f8b3f8b118dfa41149c311aa79852c84d6d4"
+}

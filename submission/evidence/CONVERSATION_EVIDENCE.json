@@ -1,0 +1,26 @@
+{
+  "provenance": "Transcribed from user terminal outputs in this conversation; original private files remain on Drive.",
+  "native_sha256": "c744a163be8b70ac2f2e840e3d0659ac33569816bf9a4ff4eb4b32918e7250a7",
+  "metadata_sha256": "36beab06660d0b5815808f5e2715211686011c01da4114fd647fa7f4e31835ef",
+  "dev_mcq": [
+    23,
+    55
+  ],
+  "hidden_mcq": [
+    8,
+    15
+  ],
+  "audit_report_sha256": "52696d5b8af0f1a968ff1370fb5c2e5f4ead63ad4e043e0aad93375302ff3ddc",
+  "audit_status": "PASS_NO_EXACT_NGRAM_OVERLAP",
+  "audit_n": 8,
+  "audit_train_overlap": 0,
+  "audit_val_overlap": 0,
+  "hidden_completion_utc": "2026-09-17T08:35:21Z",
+  "evaluator_sha256": "572087ef47f3d2c5013b6360a88e385ec8e64e421985769a8e30c8fff00b766e",
+  "original_hidden_summary_sha256": "e695746cd1cb827a45a8017a6fd4e418e26c82b1ddee485df5a3867c0daf4bd5",
+  "reported_hidden_rubric": {
+    "score": 14,
+    "maximum": 80,
+    "status": "provisional_no_ledger"
+  }
+}

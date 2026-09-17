@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Retrospectively parsed C2 console record (new documentation schema)",
+  "type": "object",
+  "required": [
+    "record_type",
+    "step",
+    "source_file",
+    "source_sha256",
+    "source_line"
+  ],
+  "properties": {
+    "record_type": {
+      "enum": [
+        "train",
+        "validation"
+      ]
+    },
+    "step": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "source_line": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "source_file": {
+      "type": "string"
+    },
+    "source_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  },
+  "additionalProperties": true
+}

@@ -1,0 +1,21 @@
+schema_version: '1.0'
+status: POST_HOC_OBSERVED_SETTINGS_NOT_A_PRE_RUN_LOCK
+checkpoint: C2_step120
+checkpoint_sha256: c744a163be8b70ac2f2e840e3d0659ac33569816bf9a4ff4eb4b32918e7250a7
+hidden_rerun_allowed: false
+provenance: Saved DEV/Hidden summaries and completion lock transcribed from conversation;
+  not a new evaluation config
+runtime:
+  gpu: Tesla T4
+  precision: FP16
+  pytorch: 2.8.0+cu128
+  cuda: '12.8'
+  cudnn: 91002
+native_open_ended_generation:
+  max_new_tokens: 256
+  temperature: 0.3
+  top_k: 50
+  seed: 42
+export_declared_context: 256
+note: Historical inference_config.yaml stays unchanged; its pending-checkpoint/greedy/128-token
+  defaults do not describe final saved native generation.
