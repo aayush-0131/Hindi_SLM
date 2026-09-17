@@ -4,8 +4,8 @@ delivery_status: READY_FOR_ORGANIZER_SUBMISSION_WITH_DISCLOSED_GAPS
 project:
   name: Hindi SLM Capstone
   program: IAIRO PRAMANA SLM++ Bootcamp
-  team_id: null
-  team_id_note: Official organizer team identifier was not recovered; do not infer it from the server account.
+  team_id: 'Team 2'
+  team_name: Qwenspiracy
   domain: Indian History & Cultural Heritage
   tasks:
   - question answering
