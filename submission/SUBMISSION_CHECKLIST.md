@@ -2,6 +2,7 @@
 
 ## Complete or recorded
 
+- [x] Official team identity recorded: **Team 2 — Qwenspiracy**.
 - [x] C2 step120 locked; native checkpoint and metadata hashes verified in Drive.
 - [x] HF export located on Lightning; all eight frozen file hashes verified.
 - [x] Frozen HF ZIP reconstructed locally, SHA256-verified (`92ca56b23cf439e76ea6d6cde44356e72a69d966f129177f6f8ea0cb47bdd516`), `unzip -t` passed, and Drive backup completed.
@@ -23,7 +24,6 @@
 
 ## Remaining before actual organizer submission
 
-- [ ] Enter the official IAIRO team identifier/team_id. It was not recovered from project evidence; do not infer it from the `team02` server account.
 - [ ] Recover the item-level Hidden open-ended scoring ledger/rubric provenance for the reported 14/80 if it still exists. Until then keep the score explicitly provisional; do not regenerate Hidden responses.
 - [ ] If available, add the exact source revision/license inventory and complete pretraining corpus file-hash list. Current records are incomplete; do not infer missing licenses/hashes.
 - [ ] Historical base gradient norms, pre-clip norms/clip flags, historical dependency lock and pretraining random seed were not recovered. Keep them marked unavailable rather than fabricating values.
@@ -36,6 +36,7 @@
 
 ## Canonical final checkpoint access
 
+- Team: **Team 2 — Qwenspiracy**
 - Hugging Face: `https://huggingface.co/Shadow0131/hindi-slm-c2-step120`
 - Verified Hub revision: `5d5821284962ece831b8f62ea2dddef89bb68101`
 - Frozen archive: `C2_step120_HF_frozen.zip`
