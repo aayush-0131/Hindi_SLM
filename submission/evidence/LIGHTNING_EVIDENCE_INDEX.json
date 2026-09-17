@@ -1,0 +1,38 @@
+{
+  "captured_utc": "20260917T133252_168947Z",
+  "source_commit": "44cd791203be73d576471e9ffffc4a43380d64c3",
+  "git_status": "?? data/\n?? eval/historybench/HistoryBench_HI_v1_DEV_75.csv\n?? eval/historybench/README.md\n?? eval/historybench/run_base_smoke.sh\n?? results/behavior/\n?? results/final_eval/\n?? results/hf_export/\n?? results/historybench/\n?? tools/",
+  "hf_export_verified_sha256": {
+    "config.json": "e85ab0897b83e00cbfe8e6fcab778aead47ec98f055f0cb237265c6601a40036",
+    "configuration_hindi_slm.py": "7164d555d2ee0f490a6a226adc4103bfd7ab5603fdbbfbf0abc82c1220f18e35",
+    "modeling_hindi_slm.py": "607b447d9fae765abdd4f4c966e9657bcf2fc5d33072e3481894ce5f41274f88",
+    "tokenization_hindi_slm.py": "eeaa2f1b1a1f5a93576c73b4f2d9b7cd5246ab9f109fe35435e7983b3e99a7a3",
+    "tokenizer.pkl": "25be857870b2cebbc1dfc729738d6e03dd1399821cdeb1d1d85a86be6ab59823",
+    "tokenizer_config.json": "0e8044e20af7e75bcd9d1471202ee9e6ed32c70af8b08053a20393f584fca29b",
+    "special_tokens_map.json": "b6486782b2ccfe169179fa533e9022621952fbe4b6f190581648d5278ffecb8b",
+    "model.safetensors": "b69f0e01088cca8f39659dcf67125003640788546021598577551e48420977a0"
+  },
+  "included_file_sha256": {
+    ".gitignore": "35fca78536edad020adff582a28bbeb631c87059d38939ade5e20a444010c9b2",
+    "CAPSTONE_STATE.md": "c8daabbad3b9cec756edeb2861ea0c2261e5a3e6f279afb88dbdab8122c43f21",
+    "deploy/requirements.txt": "b1f5f34a13c64940c4c22c40e5af44d08e564eb6031b99dd4447b4578921068a",
+    "hf_export/config.json": "e85ab0897b83e00cbfe8e6fcab778aead47ec98f055f0cb237265c6601a40036",
+    "hf_export/configuration_hindi_slm.py": "7164d555d2ee0f490a6a226adc4103bfd7ab5603fdbbfbf0abc82c1220f18e35",
+    "hf_export/modeling_hindi_slm.py": "607b447d9fae765abdd4f4c966e9657bcf2fc5d33072e3481894ce5f41274f88",
+    "hf_export/special_tokens_map.json": "b6486782b2ccfe169179fa533e9022621952fbe4b6f190581648d5278ffecb8b",
+    "hf_export/tokenization_hindi_slm.py": "eeaa2f1b1a1f5a93576c73b4f2d9b7cd5246ab9f109fe35435e7983b3e99a7a3",
+    "hf_export/tokenizer_config.json": "0e8044e20af7e75bcd9d1471202ee9e6ed32c70af8b08053a20393f584fca29b",
+    "nanochat/pyproject.toml": "c91fdd03ae9705565572eee31924d4c0bca24bf5431a8eabff4c061882f94929",
+    "nanochat/scripts/chat_sft_history.py": "4ea1d99cf9a1cdeaf66533e77ca6b73da92c7c9b927122b0632a52442b620e12",
+    "nanochat/tasks/history_hi_sft.py": "fbec1148e9d1ee8b6b7da854caf1c6e9a94ad30bad7c762dbb343a2809fa125d",
+    "results/final_eval/safety_general_base_vs_c2.jsonl": "0711ffa85e291cd4bed4980da1cf3db3697ca37d77d7cc2de65e8dd5c7202546",
+    "results/hf_export/HF_PARITY_REPORT.md": "1a3a88502c7297824fb5fcf88c397f73c4eb4b664c69853615c9271ff2ef7589",
+    "results/hf_export/SHA256SUMS.txt": "ff7d0360e2676da232544fda49b84a292b669aaba4934280d8496ff948c90155",
+    "results/training_logs/history_partial_c2.log": "2d7c3cf64a736915f3a8a63d86dfd087f1a55a1a04811af73de7c32a920faaa7"
+  },
+  "missing_optional_files": [
+    "submission/manifest.yaml",
+    "submission/train_log.schema.json"
+  ],
+  "scope": "Documentation evidence; no model weights or HistoryBench content."
+}

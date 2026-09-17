@@ -61,3 +61,26 @@ results/**/*smoke*/
 hindi_slm_runtime/
 chatsft_checkpoints/
 base_checkpoints/
+
+# Final documentation integration: precise public/private artifact boundaries
+# Keep the original model-file exclusions, but do not blanket-hide tokenizer bytes.
+!token_bytes.pt
+# Preserve exactly this reviewed C2 training evidence log.
+!/submission/evidence/history_partial_c2.log
+# All frozen benchmark formats and Hidden filenames are private.
+**/HistoryBench*FROZEN*
+**/HistoryBench*HIDDEN*
+**/HistoryBench*hidden*
+**/HistoryBench*100_candidate*
+**/predictions.jsonl
+**/open_ended_for_judging.jsonl
+/results/historybench/
+/results/behavior/
+/results/final_eval/
+/final_eval_evidence/
+/recovery/
+# Local training-data copies are not part of this documentation commit.
+/data/history_hi_sft_v1/
+/eval/historybench/HistoryBench_HI_v1_DEV_75.csv
+*.tar.gz
+*.tgz
