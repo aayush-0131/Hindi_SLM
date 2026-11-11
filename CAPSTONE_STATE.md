@@ -2,9 +2,7 @@
 
 **Project:** IAIRO PRAMANA SLM++ Bootcamp Capstone  
 **Repository:** `aayush-0131/Hindi_SLM`  
-**Canonical state timestamp:** 2026-09-15 (after midnight IST)  
-**Hard submission deadline:** 2026-09-16 00:00 IST  
-**Purpose of this file:** single source of truth for project state across long chats, machines, and fresh sessions. Read this file before making strategic or execution decisions.
+**Purpose of this file:** canonical record of the project's decisions, artifacts, evaluation and safety findings.
 
 ---
 
@@ -386,57 +384,7 @@ and no longer uses the default SmolTalk/MMLU/GSM8K mixture for this capstone SFT
 
 ---
 
-## 11. Current compute environment and exact blocker
-
-Primary remote environment is Lightning Studio `sudden-teal-clz7`.
-
-Last confirmed GPU:
-
-```text
-Tesla T4
-PyTorch 2.8.0+cu128
-CUDA: True
-```
-
-Lightning can auto-sleep after roughly 10 minutes of inactivity, so verify the machine/GPU before every long run.
-
-A 1-step native full-SFT smoke test was prepared with:
-
-```text
-model: Stable-33750
-precision: FP16 fallback
-max_seq_len: 256
-device_batch_size: 1
-total_batch_size: 256
-num_iterations: 1
-load_optimizer: 0
-chatcore: disabled
-```
-
-The test **did not reach model loading or GPU memory allocation** because it failed immediately at import time:
-
-```text
-ModuleNotFoundError: No module named 'wandb'
-```
-
-### CURRENT BLOCKER
-
-Install `wandb` in the Lightning cloudspace environment, verify import, then rerun the exact 1-step SFT smoke test. The next command should be:
-
-```bash
-python -m pip install -q wandb && python -c "import wandb; print('WANDB_IMPORT=PASS', wandb.__version__)"
-```
-
-Only after that rerun the 1-step SFT memory smoke. The outcome decides strategy:
-
-- **If full native SFT fits T4 16 GB:** proceed with short native SFT using `max_seq_len=256` and carefully chosen steps/LRs.
-- **If CUDA OOM:** immediately switch to a memory-efficient tuning approach; do not spend hours repeatedly trying full SFT settings.
-
-The previous plan to require a BF16-capable GPU before doing anything is **superseded by deadline reality**. T4/FP16 is now the available engineering fallback. Precision mismatch must be disclosed; paid compute still requires explicit approval.
-
----
-
-## 12. New mandatory Hugging Face submission requirement
+## 11. New mandatory Hugging Face submission requirement
 
 A new bootcamp instruction arrived after baseline/SFT setup:
 
@@ -462,27 +410,7 @@ HF export is now **rubric-critical**, not optional. Prototype the wrapper before
 
 ---
 
-## 13. Mac incident and local-compute decision
-
-Machine: Apple Silicon MacBook Air with **8 GB unified memory**.
-
-The first native MPS smoke test kernel-panicked/restarted after reaching model load. The panic report showed watchdog timeout and low swap headroom. NanoChat converts BF16 weights to FP32 on CPU/MPS, which is unsafe for this machine at ~910M parameters.
-
-**Decision:** never load Stable-33750 on the Mac again.
-
-Use the Mac for:
-
-- SSH/control/browser;
-- artifact transfer;
-- documentation;
-- Git/Drive operations;
-- lightweight data preparation.
-
-Use remote NVIDIA GPU for model loading, SFT and inference/evaluation.
-
----
-
-## 14. Post-training evaluation strategy
+## 12. Post-training evaluation strategy
 
 At minimum:
 
@@ -499,7 +427,7 @@ Do not use hidden performance to select checkpoints.
 
 ---
 
-## 15. Required submission/reproducibility artifacts
+## 13. Required submission/reproducibility artifacts
 
 Bootcamp intake expects, at minimum:
 
@@ -530,27 +458,7 @@ Historical fields that do not exist (especially base-training `grad_norm`) must 
 
 ---
 
-## 16. Critical path to deadline
-
-Current order of operations:
-
-1. **Install `wandb` in Lightning.**
-2. **Rerun the 1-step T4/FP16 native SFT memory smoke** at seq len 256, batch 1.
-3. **Choose fine-tuning strategy from measured memory result:** native full SFT if it fits; otherwise memory-efficient tuning immediately.
-4. **Run SFT** on the 275-row leakage-controlled Hindi history/instruction/safety dataset.
-5. **Evaluate Instruct on DEV + safety/general checks** and compare with saved Base baseline.
-6. **Prototype/finalize faithful HF `PreTrainedModel` + tokenizer export** and verify AutoModel/AutoTokenizer clean reload and parity.
-7. **Lock the final model.**
-8. **Run Hidden-25 once** on the final locked model.
-9. **Run final all-100 contamination audit for reporting.**
-10. **Compact KG guardrail/demo only if time remains.**
-11. **Finalize model card, README, report, intake, manifest, logs, inference/demo, HF weights link and submission package.**
-
-No rubric-critical requirement should be silently dropped. Moving fast means simplifying implementation and parallelizing CPU/documentation work, not fabricating evidence or weakening the evaluation protocol.
-
----
-
-## 17. Optional differentiator: Knowledge-Graph guardrail
+## 14. Optional differentiator: Knowledge-Graph guardrail
 
 After SFT/evaluation/HF-export critical path is secure, a compact Indian History/Cultural Heritage KG can be used as a differentiator:
 
@@ -563,7 +471,7 @@ This is a differentiator, **not a blocker**.
 
 ---
 
-## 18. Repository / checkpoint hygiene
+## 15. Repository / checkpoint hygiene
 
 Checkpoint files should not be committed to Git. Recommended `.gitignore` entries:
 
@@ -581,33 +489,3 @@ Do not commit the Hidden-25 benchmark file.
 
 ---
 
-## 19. Recovery protocol for a new ChatGPT thread
-
-The current long chat became UI-heavy/laggy and should be replaced with a fresh chat inside the **SLM++ Bootcamp Capstone Project**.
-
-Start the new chat with:
-
-> Read `CAPSTONE_STATE.md` in `aayush-0131/Hindi_SLM` first and treat it as the canonical state of my IAIRO SLM++ capstone. Also use the relevant context from this project. Continue exactly from the current blocker without redoing completed work. Do not change the frozen benchmark, use the hidden set for model selection, purchase compute, publish weights, or change the model/domain strategy without my approval.
-
-Then continue from **Section 11 — CURRENT BLOCKER**. The immediate next action is installing `wandb`, then rerunning the 1-step SFT memory smoke.
-
----
-
-## 20. Update policy for this file
-
-Update `CAPSTONE_STATE.md` whenever any of these changes:
-
-- canonical checkpoint;
-- artifact hash;
-- benchmark version/hash;
-- compute environment;
-- SFT dataset/version/hash;
-- chosen fine-tuning method;
-- baseline/final scores;
-- HF export/load status;
-- locked final checkpoint;
-- current blocker;
-- critical path;
-- submission status.
-
-Do not rewrite historical facts to make later results look cleaner. Append or explicitly mark superseded decisions where needed.
